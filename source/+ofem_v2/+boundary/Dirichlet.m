@@ -45,9 +45,16 @@ classdef Dirichlet < handle
 		
 		function u = loadVector(obj, physicalProblem)
 			N = max(physicalProblem.DOFs.DOFs);
-			dofs = [physicalProblem.DOFs.n2DOF(obj.nodes);...
-				physicalProblem.DOFs.e2DOF(obj.edges);...
-				physicalProblem.DOFs.f2DOF(obj.faces)];
+			dofs = [];
+			if ~isempty(physicalProblem.DOFs.n2DOF)
+				dofs = [dofs;physicalProblem.DOFs.n2DOF(obj.nodes)];
+			end
+			if ~isempty(physicalProblem.DOFs.e2DOF)
+				dofs = [dofs;physicalProblem.DOFs.e2DOF(obj.edges)];
+			end
+			if ~isempty(physicalProblem.DOFs.f2DOF)
+				dofs = [dofs;physicalProblem.DOFs.f2DOF(obj.faces)];
+			end
 			obj.u = sparse(dofs,1,obj.value,N,1);
 			
 			u = obj.u;

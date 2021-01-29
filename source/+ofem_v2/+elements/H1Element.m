@@ -59,7 +59,15 @@ classdef H1Element < ofem_v2.elements.Finite_Elements & handle
 						end
 					end
 					
-					phi = [N,E];
+					for i = 0:obj.degree-3
+						for j = 0:obj.degree-3
+							p = subs(leg.legIntS(i+2),[x,t],[N(2)-N(1),N(1)+N(2)]);
+							q = N(3)*subs(leg.leg(j+1),2*N(3)-1);
+							I = [I,p*q];
+						end
+					end
+					
+					phi = [N,E,I];
 					phi = simplify(phi);
 					obj.DOFsPerElement = size(phi,2);
 					
@@ -71,8 +79,8 @@ classdef H1Element < ofem_v2.elements.Finite_Elements & handle
 					phiFunc = matlabFunction(phi,'vars',[u,v]);
 					dPhiFunc = matlabFunction(dPhi,'vars',[u,v]);
 					obj.nodeDOFs = 1;
-					obj.edgeDOFs = obj.dim-1;
-					obj.interiorDOFs = 1/2*(obj.dim-2)*(obj.dim-1);
+					obj.edgeDOFs = obj.degree-1;
+					obj.interiorDOFs = 1/2*(obj.degree-2)*(obj.degree-1);
 					
 				case 3
 					syms u v w x t c;
@@ -94,7 +102,7 @@ classdef H1Element < ofem_v2.elements.Finite_Elements & handle
 					F = [];
 					I = [];
 					
-					for i = 0:obj.degree-1
+					for i = 0:obj.degree-2
 						for k = 1:6
 							E = [E,subs(leg.legIntS(i+2),[x,t],[N(ke(k,1))-N(ke(k,2)),N(ke(k,1))+N(ke(k,2))])];
 						end
@@ -113,12 +121,12 @@ classdef H1Element < ofem_v2.elements.Finite_Elements & handle
 					dPhiFunc = matlabFunction(dPhi,'vars',[u,v,w]);
 					
 					obj.nodeDOFs = 1;
-					obj.edgeDOFs = obj.dim-1;
-					obj.faceDOFs = 1/2*(obj.dim-2)*(obj.dim-1);
-					obj.interiorDOFs = 1/6*(obj.dim-3)*(obj.dim-2)*(obj.dim-1);
+					obj.edgeDOFs = obj.degree-1;
+					obj.faceDOFs = 1/2*(obj.degree-2)*(obj.degree-1);
+					obj.interiorDOFs = 1/6*(obj.degree-3)*(obj.degree-2)*(obj.degree-1);
 					
 			end
-
+			
 			
 			phi = phiFunc;
 			dPhi = dPhiFunc;
@@ -149,7 +157,8 @@ classdef H1Element < ofem_v2.elements.Finite_Elements & handle
 			else
 				for q=1:Nq
 					%dphi = DinvT*obj.dPhi(l(1,q),l(2,q),l(3,q));
-					lTemp = mat2cell(l(:,q),[1,1]);
+					cnt = ones(size(l(:,q),1),1);
+					lTemp = mat2cell(l(:,q),cnt);
 					dphi = DinvT*obj.dPhi(lTemp{:});
 					S = S+w(q)*(dphi'*mat*dphi);
 				end
@@ -207,33 +216,33 @@ classdef H1Element < ofem_v2.elements.Finite_Elements & handle
 		
 	end
 end
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
