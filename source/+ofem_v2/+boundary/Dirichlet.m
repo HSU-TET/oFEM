@@ -1,55 +1,81 @@
 classdef Dirichlet < handle
-    %   Summary of this class goes here
-    %   Detailed explanation goes here
-    %% Proteries
-    properties
-    value; 
-    boundary; 
-    nodes;
-    edges;
-    faces;
-    interiors;
-    index;
-    
-    u;  
-    
-    end
-    %% Methodes
-    methods
-        function obj = Dirichlet(value, boundaryName, mesh)
-            obj.value = value; 
-            
-            n = size(mesh.bd, 2);
-            for i = 1:n
-                if isequal(mesh.bd{1,i},boundaryName)
-                    obj.boundary = unique(mesh.bd{2,i});
-                    obj.index = i;
-                    break;
-                end
-            end
-            obj.nodes = unique(obj.boundary(:));
-        end
-
-        function u = loadVector(obj, physicalProblem)
-        %dB=dirichlet_loadvector(d,nodes,co)
-        %dirichlet returns the Dirichlet-originated part of the load vector.
-        
-       
-        
-        %What if there is no M,D, or M_robin?!
-            Nco = physicalProblem.geometry.Nco;  % number of nodes
-%           dof = physicalProblem.dof;
-%           D   = d(co(:,:,nodes));
-%           M_robin = d(co(:,:,nodes)); 
-      
-            physicalProblem.DOFs  = setdiff(physicalProblem.DOFs, obj.boundary);
-
-			obj.u = ones(size(obj.boundary));
-			obj.u = sparse(obj.boundary,obj.u,obj.u*obj.value,Nco,1);
-                    			
-            u = obj.u;
-            physicalProblem.DOFs.reduceDOFs(obj);
-		             
-        end
-    end
+	%   Summary of this class goes here
+	%   Detailed explanation goes here
+	%% Proteries
+	properties
+		value;
+		boundary;
+		nodes;
+		edges;
+		faces;
+		interiors;
+		index;
+		name;
+		
+		u;
+		
+	end
+	%% Methodes
+	methods
+		function obj = Dirichlet(value, boundaryName, mesh)
+			obj.value = value;
+			
+			n = size(mesh.bd, 2);
+			for i = 1:n
+				if isequal(mesh.bd{1,i},boundaryName)
+					obj.boundary = unique(sort(mesh.bd{2,i},2),'rows');
+					obj.index = i;
+					obj.name = boundaryName;
+					break;
+				end
+			end
+			switch mesh.dim
+				case 2
+					[~,obj.edges] = ismember(sort(obj.boundary,2),mesh.ed,'rows');
+					obj.edges = unique(obj.edges);
+					obj.nodes = unique(obj.boundary(:));
+				case 3
+					[~,obj.faces] = ismember(sort(obj.boundary,2),mesh.fa,'rows');
+					obj.faces = unique(obj.faces);
+					obj.edges = mesh.fa2ed(obj.faces,:);
+					obj.edges = unique(obj.edges(:));
+					obj.nodes = unique(obj.boundary(:));
+			end
+		end
+		
+		function u = loadVector(obj, physicalProblem)
+			N = max(physicalProblem.DOFs.DOFs);
+			dofs = [physicalProblem.DOFs.n2DOF(obj.nodes);...
+				physicalProblem.DOFs.e2DOF(obj.edges);...
+				physicalProblem.DOFs.f2DOF(obj.faces)];
+			obj.u = sparse(dofs,1,obj.value,N,1);
+			
+			u = obj.u;
+			physicalProblem.DOFs.reduceDOFs(obj);
+			
+		end
+	end
 end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

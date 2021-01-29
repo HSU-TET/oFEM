@@ -36,11 +36,18 @@ classdef DirichletEdge
 				obj.boundary = unique(sort(mesh.bd{2,boundaryName},2),'rows');
 				obj.index = boundaryName;
 			end
-			[~,obj.faces] = ismember(sort(obj.boundary,2),mesh.fa,'rows');
-			obj.faces = unique(obj.faces);
-			obj.edges = mesh.fa2ed(obj.faces,:);
-			obj.edges = unique(obj.edges(:));
-            obj.nodes = unique(obj.boundary(:));
+			switch mesh.dim
+				case 2
+					[~,obj.edges] = ismember(sort(obj.boundary,2),mesh.ed,'rows');
+					obj.edges = unique(obj.edges);
+					obj.nodes = unique(obj.boundary(:));
+				case 3
+					[~,obj.faces] = ismember(sort(obj.boundary,2),mesh.fa,'rows');
+					obj.faces = unique(obj.faces);
+					obj.edges = mesh.fa2ed(obj.faces,:);
+					obj.edges = unique(obj.edges(:));
+					obj.nodes = unique(obj.boundary(:));
+			end
         end
 		
 		function u = loadVector(obj, phys)

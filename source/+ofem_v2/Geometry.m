@@ -653,9 +653,9 @@ classdef Geometry < handle
 
                 case 'tri'
                     %% triangle
-                    obj.ed = [obj.el(:,[1 2]); ...
-                              obj.el(:,[2 3]); ...
-                              obj.el(:,[3 1])];
+                    obj.ed = [obj.el(:,[1 2])'; ...
+                              obj.el(:,[1 3])'; ...
+                              obj.el(:,[2 3])'];
 
                 case 'quad'
                     %% quadrilateral
@@ -719,7 +719,6 @@ classdef Geometry < handle
                     %% triangle
                     obj.fa        = obj.el;
                     obj.el2fa     = (1:Nt)';
-                    obj.el2fasign = ones(Nt,1);
 
                 case 'quad'
                     %% quadrilateral

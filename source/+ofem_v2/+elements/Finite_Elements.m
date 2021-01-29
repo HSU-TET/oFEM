@@ -7,21 +7,14 @@ classdef (Abstract) Finite_Elements < handle
         
         % Shape function of the element
         shape_function;
-        
-        % Weight and Lenth of the Gausian Qaudriture rule.
-        % used for approximation of the integral
-        gausianWeight;
-        gausianLength;        
-        gradShapeFunctions;         
-        pointwiseProductShapeFunctions; 
-
     end
     %% Methods
     
-    methods (Abstract, Access = protected)
-        calcGradShapeFunctions(shape_function);
-        calcPointwiseProductShapeFunctions(shape_function);
-        
+    methods (Abstract)
+        computeBasis(shape_function)
+		assembleMass(shape_function)
+		assembleStiffness(shape_function)
+		assembleDamping(shape_function)
     end
     
     methods

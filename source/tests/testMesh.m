@@ -17,7 +17,7 @@ mesh.type = 'tet';
 % y = linspace(0,0.005,7);
 % z = linspace(0,0.0075,11);
 
-disc = 10;
+disc = 5;
 
 x = linspace(0,pi,disc);
 y = linspace(0,pi,disc);

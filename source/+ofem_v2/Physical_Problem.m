@@ -63,6 +63,7 @@ classdef Physical_Problem < handle
         
         function assemble(obj)
             %Nc = size(obj.geometry.co  ,3);
+			obj.checkBoundaries;
             Np = size(obj.geometry.parts, 2);
             
             %obj.DOFs = 1:Nc;
@@ -113,7 +114,36 @@ classdef Physical_Problem < handle
         
         function attachDOFHandler(obj,DOFHandler)
             obj.DOFs = DOFHandler;
-        end
+		end
+		
+		function checkBoundaries(obj)
+			if size(obj.geometry.bd,1) == 3
+                nB= size(obj.geometry.bd,2);
+                for i=1:nB
+					for j = i+1:nB
+						if ~isempty(obj.geometry.bd{3,i}) && ~isempty(obj.geometry.bd{3,j})
+							[~,idx] = ismember(obj.geometry.bd{3,i}.nodes,obj.geometry.bd{3,j}.nodes);
+							if sum(idx) > 0
+								while true
+									display('Please choose which to keep!',...
+										'2 Boundaries contain the same nodes!');
+									x = input(['[1] ',obj.geometry.bd{3,i}.name,' or [2] ',obj.geometry.bd{3,j}.name,'\n>> ']);
+									if x == 1
+										obj.geometry.bd{3,j}.nodes(nonzeros(idx)) = [];
+										break;
+									elseif x == 2
+										obj.geometry.bd{3,i}.nodes(idx~=0) = [];
+										break;
+									else
+										disp('Invalid Input!')
+									end
+								end
+							end
+						end
+					end
+				end
+			end
+		end
         
         function du = gradCell(obj,u)
             % Computes the gradient inside each cell. No patch recovery

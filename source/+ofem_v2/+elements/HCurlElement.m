@@ -1,4 +1,4 @@
-classdef NedelecZagl < ofem_v2.elements.Finite_Elements & handle
+classdef HCurlElement < ofem_v2.elements.Finite_Elements & handle
     %NEDELECZAGL Summary of this class goes here
     %   Detailed explanation goes here
     
@@ -8,9 +8,6 @@ classdef NedelecZagl < ofem_v2.elements.Finite_Elements & handle
         gausianLength;
         gradShapeFunctions;
         pointwiseProductShapeFunctions;
-    end
-    
-    properties (Access = public)
         dim;
         degree;
         degreeMass;
@@ -30,7 +27,7 @@ classdef NedelecZagl < ofem_v2.elements.Finite_Elements & handle
     end
     
     methods
-        function obj = NedelecZagl(dim, deg)
+        function obj = HCurlElement(dim, deg)
             %NEDELEC Construct an instance of this class
             %   Detailed explanation goes here
             obj.dim = dim;
@@ -130,7 +127,6 @@ classdef NedelecZagl < ofem_v2.elements.Finite_Elements & handle
                         end
                     end
                     I2 = I;
-                    %E = [E{1},E{2},E{3},E{4},E{5},E{6}];
                     E = reshape([E1,E2],obj.dim,size(E1,2),2);
                     F = reshape([F1,F2],obj.dim,size(F1,2),2);
                     I = reshape([I,I2],obj.dim,size(I,2),2);
@@ -143,33 +139,24 @@ classdef NedelecZagl < ofem_v2.elements.Finite_Elements & handle
                         curlN(:,i,2) = curl(curlN(:,i,2),dr);
                     end
                     
-                    %[~,lc] = ofem_v2.tools.gaussSimplex(obj.dim,obj.degreeStiff);
-                    %[~,l] = ofem_v2.tools.gaussSimplex(obj.dim,obj.degreeMass);
-                    %N = repmat(N,1,1,size(l,2));
-                    %curlN = repmat(curlN,1,1,size(lc,2));
                     curlFunc{1} = matlabFunction(curlN(:,:,1),'vars',[u,v,w]);
                     curlFunc{2} = matlabFunction(curlN(:,:,2),'vars',[u,v,w]);
-%                     for i=1:size(lc,2)
-%                         curlVal(:,:,i) = curlN(lc(1,i),lc(2,i),lc(3,i));
-%                     end
                     NFunc{1} = matlabFunction(N(:,:,1),'vars',[u,v,w]);
                     NFunc{2} = matlabFunction(N(:,:,2),'vars',[u,v,w]);
-%                     for i=1:size(l,2)
-%                         NVal(:,:,i) = N(l(1,i),l(2,i),l(3,i));
-%                     end
+
                     obj.faceDOFs = size(F,2);
                     obj.edgeDOFs = size(E,2);
                     obj.interiorDOFs = size(I,2);
-                    N = NFunc;%double(N);
-                    curlN = curlFunc;%double(curlN);
-                    obj.N = NFunc;%N;
+                    N = NFunc;
+                    curlN = curlFunc;
+                    obj.N = NFunc;
                     obj.curlN = curlFunc;
             end
         end
         
         
         
-        function S = assembleStiffness(obj,phys,pIdx,A)
+        function S = assembleStiffness(obj,phys,pIdx,mat)
             refTet = phys.geometry.refTet(pIdx);
             [w,l] = ofem_v2.tools.gaussSimplex(obj.dim,obj.degreeStiff);
             dofs = phys.DOFs.el2DOF(pIdx,:);
@@ -183,12 +170,12 @@ classdef NedelecZagl < ofem_v2.elements.Finite_Elements & handle
             
             S = ofem_v2.tools.matrixarray(zeros(Ns,Ns,Ne));
             
-            if isa(A,'function_handle')
+            if isa(mat,'function_handle')
                 elco = reshape(phys.geometry.co(:,:,el(pIdx,1:Nl)'),[],Nl,Ne);
                 for q=1:Nq
                     X = elco*(l(q,:)');
                     dphii = Dk(:,:,pIdx)*(obj.curlN(:,:,q).*sign);
-                    S = S+w(q)*(dphii'*A(X)*dphii);
+                    S = S+w(q)*(dphii'*mat(X)*dphii);
                 end
             else
                 for q=1:Nq
@@ -196,7 +183,7 @@ classdef NedelecZagl < ofem_v2.elements.Finite_Elements & handle
                     dphi(:,:,2) = obj.curlN{2}(l(1,q),l(2,q),l(3,q));
                     dphi =  Dk*ofem_v2.tools.matrixarray(dphi(:,:,refTet));
 %                     dphii = (Dk*obj.curlN(:,:,q));
-                    S = S+w(q)*(dphi'*A*dphi);
+                    S = S+w(q)*(dphi'*mat*dphi);
                 end
             end
             
@@ -211,7 +198,7 @@ classdef NedelecZagl < ofem_v2.elements.Finite_Elements & handle
             
         end
         
-        function M = assembleMass(obj,phys,pIdx,c)
+        function M = assembleMass(obj,phys,pIdx,mat)
             refTet = phys.geometry.refTet(pIdx);
             [w,l] = ofem_v2.tools.gaussSimplex(obj.dim,obj.degreeMass);
             dofs = phys.DOFs.el2DOF(pIdx,:);
@@ -225,19 +212,19 @@ classdef NedelecZagl < ofem_v2.elements.Finite_Elements & handle
             
             M=ofem_v2.tools.matrixarray(zeros(Ns,Ns,Ne));
             
-            if isa(c,'function_handle')
+            if isa(mat,'function_handle')
                 elco = reshape(phys.geometry.co(:,:,el(pIdx,1:Nl)'),[],Nl,Ne);
                 for q=1:Nq
                     X = elco*(l(q,:)');
                     phii = DinvT(:,:,pIdx)'*(obj.N(:,:,q).*sign);
-                    M = M+w(q)*(phii'*c(X)*phii);
+                    M = M+w(q)*(phii'*mat(X)*phii);
                 end
             else
                 for q=1:Nq
                     phi(:,:,1) = obj.N{1}(l(1,q),l(2,q),l(3,q));
                     phi(:,:,2) = obj.N{2}(l(1,q),l(2,q),l(3,q));
                     phi =  DinvT*ofem_v2.tools.matrixarray(phi(:,:,refTet));
-                    M = M+w(q)*(phi'*c*phi);
+                    M = M+w(q)*(phi'*mat*phi);
                 end
             end
             
@@ -254,10 +241,10 @@ classdef NedelecZagl < ofem_v2.elements.Finite_Elements & handle
             %             spy(M)
         end
         
-        function D = assembleDamping(obj,phys,pIdx,v)
+        function D = assembleDamping(obj,phys,pIdx,mat)
         end
         
-        function D = assembleVelocityTerm(obj,phys,pIdx,c,v)
+        function D = assembleVelocityTerm(obj,phys,pIdx,mat,v)
             [w,l] = ofem_v2.tools.gaussSimplex(obj.dim,obj.degreeMass);
             dofs = phys.DOFs.el2DOF(pIdx,:);
             DinvT = phys.geometry.DinvT(:,:,pIdx);
@@ -272,12 +259,12 @@ classdef NedelecZagl < ofem_v2.elements.Finite_Elements & handle
             
             refTet = phys.geometry.refTet(pIdx);
             
-            if isa(c,'function_handle')
+            if isa(mat,'function_handle')
                 elco = reshape(phys.geometry.co(:,:,el(pIdx,1:Nl)'),[],Nl,Ne);
                 for q=1:Nq
                     X = elco*(l(q,:)');
                     phii = DinvT(:,:,pIdx)'*(obj.N(:,:,q).*sign);
-                    M = M+w(q)*(phii'*c(X)*phii);
+                    M = M+w(q)*(phii'*mat(X)*phii);
                 end
             else
                 for q=1:Nq
@@ -287,7 +274,7 @@ classdef NedelecZagl < ofem_v2.elements.Finite_Elements & handle
                     dphi(:,:,2) = obj.curlN{2}(l(1,q),l(2,q),l(3,q));
                     phi =  DinvT*ofem_v2.tools.matrixarray(phi(:,:,refTet));
                     dphi =  cross(repmat(v,1,Ns,length(pIdx)),Dk*ofem_v2.tools.matrixarray(dphi(:,:,refTet)));
-                    D = D+w(q)*(dphi'*c*phi);
+                    D = D+w(q)*(dphi'*mat*phi);
                 end
             end
             
@@ -451,47 +438,9 @@ classdef NedelecZagl < ofem_v2.elements.Finite_Elements & handle
             
             Y_g = blkdiag(Y_N0,Y_E,Y_F,Y_I);
             S_g = Y_g'*phys.M*Y_g;
-        end
-        
-        function signs = setSign(obj,mesh,pIdx)
-            signs1 = ofem_v2.tools.matrixarray(mesh.el2edsign(pIdx,:));
-            signs1 = reshape(signs1',1,size(signs1,2),[]);
-            if obj.degree > 0
-                signs1(2:obj.edgeDOFs/6,:,:) = 1;
-                %signs1 = repmat(signs1,obj.degree+1,1,1);
-            end
-            if obj.degree > 1
-                signs2 = mesh.el2fasign(pIdx,:);
-                signs2 = reshape(signs2',1,size(signs2,2),[]);
-                signs2 = repmat(signs2,obj.faceDOFs/4,1,1);
-                signs2(:,:,:) = 1;
-                signs2 = reshape(signs2,1,obj.faceDOFs,length(pIdx));
-            else
-                signs2 = [];
-            end
-            if obj.degree > 2
-                signs3 = ones(1,obj.interiorDOFs,length(pIdx));
-            else
-                signs3 = [];
-            end
-            signs = reshape(signs1,1,obj.edgeDOFs,length(pIdx));
-            if obj.degree > 1 && ~isempty(signs2)
-                signs = [signs,signs2];
-            end
-            if obj.degree > 2 && ~isempty(signs3)
-                signs = [signs,signs3];
-            end
-        end
+		end
         
     end
     
-    methods (Access = protected)
-        function calcGradShapeFunctions(shape_function)
-            test=1;
-        end
-        function calcPointwiseProductShapeFunctions(shape_function)
-            test = 1;
-        end
-    end
 end
 

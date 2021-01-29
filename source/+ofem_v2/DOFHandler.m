@@ -37,10 +37,10 @@ classdef DOFHandler < handle
 		
 		function generateDOFs(obj)
 			obj.nDOFs = 1:obj.elements{1}.nodeDOFs*obj.geom.Nco;
-			obj.eDOFs = 1:obj.elements{1}.edgeDOFs/6*obj.geom.Ned;
-            obj.eDOFs = reshape(obj.eDOFs,[],obj.elements{1}.edgeDOFs/6)';
+			obj.eDOFs = 1:obj.elements{1}.edgeDOFs*obj.geom.Ned;
+            obj.eDOFs = reshape(obj.eDOFs,[],obj.elements{1}.edgeDOFs)';
             obj.eDOFs = obj.eDOFs(:)';
-			obj.fDOFs = 1:obj.elements{1}.faceDOFs/4*obj.geom.Nfa;
+			obj.fDOFs = 1:obj.elements{1}.faceDOFs*obj.geom.Nfa;
 			obj.iDOFs = 1:obj.elements{1}.interiorDOFs*obj.geom.Nint;
 			
 			if ~isempty(obj.eDOFs)&&~isempty(obj.nDOFs)
@@ -60,12 +60,13 @@ classdef DOFHandler < handle
                     reshape(obj.n2DOF(obj.geom.el',:)',[],obj.geom.Nint)'];
             end
             if ~isempty(obj.eDOFs)
-                obj.e2DOF = reshape(obj.eDOFs,obj.elements{1}.edgeDOFs/6,[])';
+                obj.e2DOF = reshape(obj.eDOFs,obj.elements{1}.edgeDOFs,[])';
                 obj.el2DOF = [obj.el2DOF,...
-                    reshape(obj.e2DOF(obj.geom.el2ed(:),:),obj.geom.Nint,obj.elements{1}.edgeDOFs)];
+                    reshape(obj.e2DOF(obj.geom.el2ed(:),:),obj.geom.Nint,[])];
+				%reshape(obj.e2DOF(obj.geom.el2ed(:),:),obj.geom.Nint,obj.elements{1}.edgeDOFs)];
             end
             if ~isempty(obj.fDOFs)
-                obj.f2DOF = reshape(obj.fDOFs,obj.elements{1}.faceDOFs/4,[])';
+                obj.f2DOF = reshape(obj.fDOFs,obj.elements{1}.faceDOFs,[])';
                 obj.el2DOF = [obj.el2DOF,...
                     reshape(obj.f2DOF(obj.geom.el2fa',:)',[],obj.geom.Nint)'];
             end
