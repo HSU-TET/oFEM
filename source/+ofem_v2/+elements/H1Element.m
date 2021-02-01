@@ -36,6 +36,37 @@ classdef H1Element < ofem_v2.elements.Finite_Elements & handle
 		
 		function [phi,dPhi] = computeBasis(obj)
 			switch obj.dim
+				case 1
+					syms u x t c;
+					dr = u;
+					
+					l1 = 1-u;
+					l2 = u;
+					
+					N = [l1,l2];
+					E = [];
+					
+					leg = ofem_v2.tools.LegPoly;
+					leg.computePolynomials(obj.degree+2);
+					
+					for i = 0:obj.degree-2
+						E = [E,subs(leg.legIntS(i+2),[x,t],[N(2)-N(1),N(1)+N(2)])];
+					end
+					
+					phi = [N,E];
+					phi = simplify(phi);
+					obj.DOFsPerElement = size(phi,2);
+					
+					dPhi = sym(zeros(2,size(phi,2)));
+					for i = 1:size(phi,2)
+						dPhi(:,i) = gradient(phi(i),dr);
+					end
+					
+					phiFunc = matlabFunction(phi,'vars',[u]);
+					dPhiFunc = matlabFunction(dPhi,'vars',[u]);
+					obj.nodeDOFs = 1;
+					obj.edgeDOFs = obj.degree-1;
+					
 				case 2
 					syms u v x t c;
 					dr = [u,v];
@@ -55,7 +86,7 @@ classdef H1Element < ofem_v2.elements.Finite_Elements & handle
 					
 					for i = 0:obj.degree-2
 						for k = 1:3
-							E = [E,subs(leg.legIntS(i+2),[x,t],[N(ke(k,1))-N(ke(k,2)),N(ke(k,1))+N(ke(k,2))])];
+							E = [E,subs(leg.legIntS(i+2),[x,t],[N(ke(k,2))-N(ke(k,1)),N(ke(k,1))+N(ke(k,2))])];
 						end
 					end
 					
