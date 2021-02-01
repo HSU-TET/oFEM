@@ -162,7 +162,7 @@ classdef Physical_Problem < handle
         
         function solve(obj)
             %DOFs = obj.DOFs.getDOFs;
-            DOFs = obj.DOFs;
+            DOFs = obj.DOFs.freeDOFs;
             obj.u(DOFs) = obj.S(DOFs,DOFs)\obj.b(DOFs);
             
         end
@@ -170,13 +170,14 @@ classdef Physical_Problem < handle
         function parabolic_solve(obj, init, timesteps, deltaTime)
             
             %           Passt das so ?berhaupt?!
-            
-            obj.u(obj.dof)= init.value;
+            dofs = obj.DOFs.freeDOFs;
+            obj.u(dofs)= init.value;
             dt= deltaTime;
             n = timesteps;
-            for i = 0:n
+			obj.geometry.export_UCD([pwd, '/export'],['export',num2str(0)], {'T', obj.u, ''});
+            for i = 1:n
                 b2 = obj.b+obj.M/dt*obj.u;
-                obj.u(obj.dof) = (obj.S(obj.dof,obj.dof)+obj.M(obj.dof, obj.dof)/dt+obj.M_robin(obj.dof, obj.dof))\b2(obj.dof); % change something
+                obj.u(dofs) = (obj.S(dofs,dofs)+obj.M(dofs,dofs)/dt+obj.M_robin(dofs,dofs))\b2(dofs); % change something
                 
                 obj.geometry.export_UCD([pwd, '/export'],['export',num2str(i)], {'T', obj.u, ''});
             end
@@ -184,4 +185,21 @@ classdef Physical_Problem < handle
         
     end
 end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

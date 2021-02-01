@@ -227,7 +227,9 @@ classdef H1Element < ofem_v2.elements.Finite_Elements & handle
 				end
 			else
 				for q=1:Nq
-					phi = obj.phi{1}(l(1,q),l(2,q),l(3,q));
+					cnt = ones(size(l(:,q),1),1);
+					lTemp = mat2cell(l(:,q),cnt);
+					phi = obj.phi(lTemp{:});
 					M = M+w(q)*(phi'*mat*phi);
 				end
 			end

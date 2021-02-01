@@ -9,6 +9,8 @@ classdef  Material
        e_mod;       % e_modulus;
        kappa;       % thermal_conductivity;
        c;           % specific_heat_capacity;
+	   stiff;
+	   mass;
         
 	end
 	
