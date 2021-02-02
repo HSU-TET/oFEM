@@ -55,7 +55,14 @@ classdef Dirichlet < handle
 			if ~isempty(physicalProblem.DOFs.f2DOF)
 				dofs = [dofs;physicalProblem.DOFs.f2DOF(obj.faces)];
 			end
-			obj.u = sparse(dofs,1,obj.value,N,1);
+			
+			if isa(obj.value,'function_handle')
+				loco = physicalProblem.geometry.co(:,:,obj.nodes);
+				F = obj.value(loco);
+				obj.u = sparse(dofs,1,F,N,1);
+			else
+				obj.u = sparse(dofs,1,obj.value,N,1);
+			end
 			
 			u = obj.u;
 			physicalProblem.DOFs.reduceDOFs(obj);

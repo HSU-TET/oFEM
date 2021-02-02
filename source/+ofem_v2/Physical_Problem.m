@@ -162,8 +162,8 @@ classdef Physical_Problem < handle
         
         function solve(obj)
             %DOFs = obj.DOFs.getDOFs;
-            DOFs = obj.DOFs.freeDOFs;
-            obj.u(DOFs) = obj.S(DOFs,DOFs)\obj.b(DOFs);
+            dofs = obj.DOFs.freeDOFs;
+            obj.u(dofs) = obj.S(dofs,dofs)\obj.b(dofs);
             
         end
         

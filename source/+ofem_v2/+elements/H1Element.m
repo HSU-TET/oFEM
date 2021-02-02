@@ -195,7 +195,7 @@ classdef H1Element < ofem_v2.elements.Finite_Elements & handle
 				end
 			end
 			
-			S=S*ofem_v2.tools.matrixarray(1./abs(detD));
+			S=S*ofem_v2.tools.matrixarray(abs(detD));
 			
 			I = repmat(dofs,1,size(S,1))';
 			I = I(:);
@@ -247,6 +247,41 @@ classdef H1Element < ofem_v2.elements.Finite_Elements & handle
 		function D = assembleDamping(obj,phys,pIdx,mat)
 		end
 		
+		function b = volumeForce(obj,phys,pIdx,value)
+			[w,l] = ofem_v2.tools.gaussSimplex(obj.dim,obj.degreeMass);
+			dofs = phys.DOFs.el2DOF(pIdx,:);
+			detD = phys.geometry.detD(:,:,pIdx);
+			
+			Ns = obj.DOFsPerElement;
+			Nq = size(w   ,1);
+			Ne = length(pIdx);
+			Nl = size(phys.geometry.el,2);
+			
+			F = ofem_v2.tools.matrixarray(zeros(Ns,1,Ne));
+			
+			
+			if isa(value,'function_handle')
+				loco = reshape(phys.geometry.co(:,:,phys.geometry.el(pIdx,:)'),[],Nl,Ne);
+				for q=1:Nq
+					X = loco*([l(:,q);1-sum(l(:,q))]);
+					cnt = ones(size(l(:,q),1),1);
+					lTemp = mat2cell(l(:,q),cnt);
+					phi = obj.phi(lTemp{:});
+					F = F+w(q)*(phi'*value(X));
+				end
+			else
+				for q=1:Nq
+					cnt = ones(size(l(:,q),1),1);
+					lTemp = mat2cell(l(:,q),cnt);
+					phi = obj.phi(lTemp{:});
+					F = F+w(q)*(phi'*value);
+				end
+			end
+			
+			F = F*abs(detD);
+			
+			b = sparse(dofs',1,F(:),phys.DOFs.Nd,1);
+		end
 	end
 end
 
