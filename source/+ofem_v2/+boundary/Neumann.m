@@ -40,8 +40,8 @@ classdef Neumann < handle
 					obj.edges = unique(obj.edges);
 					obj.nodes = unique(obj.boundary(:));
 					edges = mesh.co(:,:,mesh.bd{2, obj.index}(:,2))- mesh.co(:,:,mesh.bd{2, obj.index}(:,1));
-					obj.meas = sqrt(dot(edges,edges,1));
-					obj.normalVector = -edges.rot;
+					obj.meas = ofem_v2.tools.matrixarray(sqrt(dot(edges,edges,1)));
+					obj.normalVector = -edges.rot*(1/obj.meas);
 					obj.dim = 1;
 					obj.elems = size(obj.edges,1);
 				case 3
@@ -84,11 +84,21 @@ classdef Neumann < handle
 			
 			F      = ofem_v2.tools.matrixarray(zeros(1,Ns,Nf));
 			
-			for q=1:Nq
-				cnt = ones(size(l(:,q),1),1);
-				lTemp = mat2cell(l(:,q),cnt);
-				phi = obj.feBd.phi(lTemp{:});
-				F = F + obj.value*(w(q)*phi(:,q)');
+			if isa(obj.value,'function_handle')
+				for q  = 1:Nq
+					cnt = ones(size(l(:,q),1),1);
+					lTemp = mat2cell(l(:,q),cnt);
+					phi = obj.feBd.phi(lTemp{:});
+					val = obj.value(obj.normalVector);
+					F = F + val'*(w(q)*phi);
+				end
+			else
+				for q=1:Nq
+					cnt = ones(size(l(:,q),1),1);
+					lTemp = mat2cell(l(:,q),cnt);
+					phi = obj.feBd.phi(lTemp{:});
+					F = F + obj.value*(w(q)*phi');
+				end
 			end
 			
 			F = F*obj.meas;

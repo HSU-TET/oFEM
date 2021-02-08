@@ -154,8 +154,8 @@ classdef Physical_Problem < handle
             DinvT = obj.geometry.DinvT;
             uElem = u(obj.geometry.el(:,:));
             uElem = ofem_v2.tools.matrixarray(reshape(uElem',size(uElem,2),1,[]));
-            phi = obj.element.gradShapeFunctions;
-            du = (DinvT*phi')*uElem;
+            phi = obj.element.dPhi;
+            du = (DinvT*phi(1/3,1/3))*uElem;
         end
         
         
