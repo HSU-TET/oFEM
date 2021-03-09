@@ -1,4 +1,4 @@
-classdef DirichletEdge
+classdef DirichletEdge < handle & ofem_v2.boundary.FixedBoundary
 	%DIRICHLETEDGE Summary of this class goes here
 	%   Detailed explanation goes here
 	

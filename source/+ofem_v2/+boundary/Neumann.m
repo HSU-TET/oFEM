@@ -1,4 +1,4 @@
-classdef Neumann < handle
+classdef Neumann < handle & ofem_v2.boundary.NaturalBoundary
 	
 	%% Proteries
 	properties

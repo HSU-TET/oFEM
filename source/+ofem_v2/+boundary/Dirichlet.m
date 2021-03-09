@@ -1,4 +1,4 @@
-classdef Dirichlet < handle
+classdef Dirichlet < handle & ofem_v2.boundary.FixedBoundary
 	%   Summary of this class goes here
 	%   Detailed explanation goes here
 	%% Proteries

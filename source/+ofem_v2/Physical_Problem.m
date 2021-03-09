@@ -105,9 +105,9 @@ classdef Physical_Problem < handle
                 nB= size(obj.geometry.bd,2);
                 for i=1:nB
                     if ~isempty(obj.geometry.bd{3,i})
-						if isa(obj.geometry.bd{3,i},'ofem_v2.boundary.Dirichlet')
+						if isa(obj.geometry.bd{3,i},'ofem_v2.boundary.FixedBoundary')
                         	obj.u = obj.u + obj.geometry.bd{3,i}.loadVector(obj);
-						elseif isa(obj.geometry.bd{3,i},'ofem_v2.boundary.Neumann')
+						elseif isa(obj.geometry.bd{3,i},'ofem_v2.boundary.NaturalBoundary')
 							obj.b = obj.b + obj.geometry.bd{3,i}.loadVector(obj);
 						end
                     end
