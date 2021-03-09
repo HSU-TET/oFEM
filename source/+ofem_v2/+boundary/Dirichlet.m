@@ -44,24 +44,27 @@ classdef Dirichlet < handle & ofem_v2.boundary.FixedBoundary
 		end
 		
 		function u = loadVector(obj, physicalProblem)
+			% Careful! Only vertex based DOFs get a value if the field is
+			% constant! This requires further work and testing. All others
+			% still remain fixed!
 			N = max(physicalProblem.DOFs.DOFs);
 			dofs = [];
 			if ~isempty(physicalProblem.DOFs.n2DOF)
 				dofs = [dofs;physicalProblem.DOFs.n2DOF(obj.nodes)];
 			end
-			if ~isempty(physicalProblem.DOFs.e2DOF)
-				dofs = [dofs;physicalProblem.DOFs.e2DOF(obj.edges)];
-			end
-			if ~isempty(physicalProblem.DOFs.f2DOF)
-				dofs = [dofs;physicalProblem.DOFs.f2DOF(obj.faces)];
-			end
-			
 			if isa(obj.value,'function_handle')
 				loco = physicalProblem.geometry.co(:,:,obj.nodes);
 				F = obj.value(loco);
 				obj.u = sparse(dofs,1,F,N,1);
 			else
 				obj.u = sparse(dofs,1,obj.value,N,1);
+			end
+			
+			if ~isempty(physicalProblem.DOFs.e2DOF)
+				dofs = [dofs;physicalProblem.DOFs.e2DOF(obj.edges)];
+			end
+			if ~isempty(physicalProblem.DOFs.f2DOF)
+				dofs = [dofs;physicalProblem.DOFs.f2DOF(obj.faces)];
 			end
 			
 			u = obj.u;

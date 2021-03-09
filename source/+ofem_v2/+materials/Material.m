@@ -1,4 +1,4 @@
-classdef  Material
+classdef  Material < dynamicprops
     % Material class specifies the material properties 
     
     properties  %(SetAccess= private)

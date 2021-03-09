@@ -269,6 +269,13 @@ classdef H1Element < ofem_v2.elements.Finite_Elements & handle
 					phi = obj.phi(lTemp{:});
 					F = F+w(q)*(phi'*value(X));
 				end
+			elseif isa(value,'ofem_v2.tools.matrixarray')
+				for q=1:Nq
+					cnt = ones(size(l(:,q),1),1);
+					lTemp = mat2cell(l(:,q),cnt);
+					phi = obj.phi(lTemp{:});
+					F = F+w(q)*(phi'*value);
+				end
 			else
 				for q=1:Nq
 					cnt = ones(size(l(:,q),1),1);
