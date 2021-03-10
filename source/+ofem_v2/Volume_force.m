@@ -33,7 +33,7 @@ classdef Volume_force < handle
         end
 
         function f = force(obj, phys, pIdx)
-            f = phys.element.volumeForce(phys,pIdx,obj.value);
+            f = phys.element.volumeForce(phys,obj.value,pIdx);
         end
                 
     end

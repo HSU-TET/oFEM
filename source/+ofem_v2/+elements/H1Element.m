@@ -247,7 +247,7 @@ classdef H1Element < ofem_v2.elements.Finite_Elements & handle
 		function D = assembleDamping(obj,phys,pIdx,mat)
 		end
 		
-		function b = volumeForce(obj,phys,pIdx,value)
+		function b = volumeForce(obj,phys,value,pIdx)
 			[w,l] = ofem_v2.tools.gaussSimplex(obj.dim,obj.degreeMass);
 			dofs = phys.DOFs.el2DOF(pIdx,:);
 			detD = phys.geometry.detD(:,:,pIdx);
