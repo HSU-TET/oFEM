@@ -73,6 +73,8 @@ classdef Physical_Problem < handle
             obj.D=sparse(Nc,Nc);
             obj.M=sparse(Nc,Nc);
             obj.b=sparse(Nc,1);
+			
+			obj.M_robin = sparse(Nc,Nc);
             
             obj.u = sparse(Nc,1);
             
@@ -109,10 +111,13 @@ classdef Physical_Problem < handle
                         	obj.u = obj.u + obj.geometry.bd{3,i}.loadVector(obj);
 						elseif isa(obj.geometry.bd{3,i},'ofem_v2.boundary.NaturalBoundary')
 							obj.b = obj.b + obj.geometry.bd{3,i}.loadVector(obj);
+						elseif isa(obj.geometry.bd{3,i},'ofem_v2.boundary.MixedBoundary')
+							obj.b = obj.b + obj.geometry.bd{3,i}.loadVector(obj);
+							obj.M_robin = obj.M_robin + obj.geometry.bd{3,i}.assembleMass(obj);
 						end
                     end
                 end
-                obj.b = obj.b - (obj.S+obj.M+obj.D)*obj.u;
+                obj.b = obj.b - (obj.S+obj.M+obj.D+obj.M_robin)*obj.u;
             end
         end
         

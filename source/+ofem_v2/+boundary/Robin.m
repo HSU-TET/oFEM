@@ -1,6 +1,7 @@
-classdef Neumann < handle & ofem_v2.boundary.NaturalBoundary
+classdef Robin < handle & ofem_v2.boundary.MixedBoundary
+	%ROBINBOUNDARY Summary of this class goes here
+	%   Detailed explanation goes here
 	
-	%% Proteries
 	properties
 		value;
 		boundary;
@@ -14,21 +15,22 @@ classdef Neumann < handle & ofem_v2.boundary.NaturalBoundary
 		nodes;
 		faces;
 		elems;
+		alpha;
 		
+		M;
 		b;
 	end
 	
-	%% Methods
 	methods
-		
-		function obj=Neumann(value, feBd, boundaryName, mesh)
+		function obj=Robin(value, alpha, feBd, boundaryName, mesh)
 			obj.value = value;
 			obj.feBd = feBd;
+			obj.alpha = alpha;
 			
 			n = size(mesh.bd, 2);
 			for i = 1:n
 				if isequal(mesh.bd{1,i},boundaryName)
-					obj.boundary = unique(sort(mesh.bd{2,i},2),'rows');
+					obj.boundary = mesh.bd{2,i};%unique(sort(mesh.bd{2,i},2),'rows');
 					obj.index= i;
 					break;
 				end
@@ -51,7 +53,7 @@ classdef Neumann < handle & ofem_v2.boundary.NaturalBoundary
 					obj.edges = unique(obj.edges(:));
 					obj.nodes = unique(obj.boundary(:));
 					e1 = mesh.co(:,:,mesh.bd{2, obj.index}(:,2))-mesh.co(:,:,mesh.bd{2, obj.index}(:,1));
-					e2 = mesh.co(:,:,obj.boundary(:,3))-mesh.co(:,:,obj.boundary(:,1));
+					e2 = mesh.co(:,:,mesh.bd{2, obj.index}(:,3))-mesh.co(:,:,mesh.bd{2, obj.index}(:,1));
 					obj.normalVector = cross(e1,e2,1);
 					obj.meas = sqrt(dot(obj.normalVector,obj.normalVector,1))/2;
 					obj.dim = 2;
@@ -97,17 +99,71 @@ classdef Neumann < handle & ofem_v2.boundary.NaturalBoundary
 					cnt = ones(size(l(:,q),1),1);
 					lTemp = mat2cell(l(:,q),cnt);
 					phi = obj.feBd.phi(lTemp{:});
-					F = F + obj.value*(w(q)*phi');
+					F = F + obj.value*(w(q)*phi);
 				end
 			end
 			
 			F = F*obj.meas;
-			obj.b = sparse(obj.boundary(:),1,F(:),N,1);
+			I = obj.boundary';
+			obj.b = sparse(I(:),1,F(:),N,1);
 			b = obj.b;
 		end
+		
+		function M = assembleMass(obj, physicalProblem)
+			[w,l] = ofem_v2.tools.gaussSimplex(obj.dim, obj.feBd.degree);
+			
+			N = max(physicalProblem.DOFs.DOFs);
+			dofs = [];
+			if ~isempty(physicalProblem.DOFs.n2DOF)
+				dofs = [dofs;physicalProblem.DOFs.n2DOF(obj.nodes)];
+			end
+			if ~isempty(physicalProblem.DOFs.e2DOF)
+				dofs = [dofs;physicalProblem.DOFs.e2DOF(obj.edges)];
+			end
+			if ~isempty(physicalProblem.DOFs.f2DOF)
+				dofs = [dofs;physicalProblem.DOFs.f2DOF(obj.faces)];
+			end
+			
+			Nl     = size(l  ,2); % number of barycentric coordinates
+			Nq     = size(w  ,1);
+			Ns     = obj.feBd.DOFsPerElement;
+			Nf     = obj.elems;
+			
+			% faceco gives global quadrature points => eval there
+			%faceco = reshape(physicalProblem.geometry.co(:,:,obj.bd(:,1:Nl)'),[],Nl,Nf);
+			
+			M      = ofem_v2.tools.matrixarray(zeros(Ns,Ns,Nf));
+			
+			if isa(obj.value,'function_handle')
+				for q  = 1:Nq
+					cnt = ones(size(l(:,q),1),1);
+					lTemp = mat2cell(l(:,q),cnt);
+					phi = obj.feBd.phi(lTemp{:});
+					val = obj.value(obj.normalVector);
+					F = F + val'*(w(q)*phi);
+				end
+			else
+				for q=1:Nq
+					cnt = ones(size(l(:,q),1),1);
+					lTemp = mat2cell(l(:,q),cnt);
+					phi = obj.feBd.phi(lTemp{:});
+					M = M + obj.alpha*w(q)*(phi'*phi);
+				end
+			end
+			
+			I = repmat(obj.boundary,1,size(M,1))';
+			J = repelem(obj.boundary',size(M,1),1);
+			M = M*obj.meas;
+			obj.M = sparse(I(:),J(:),M(:),N,N);
+			M = obj.M;
+		end
 	end
-	
 end
+
+
+
+
+
 
 
 
