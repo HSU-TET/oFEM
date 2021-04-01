@@ -144,8 +144,8 @@ classdef HCurlElement < ofem_v2.elements.Finite_Elements & handle
                     NFunc{1} = matlabFunction(N(:,:,1),'vars',[u,v,w]);
                     NFunc{2} = matlabFunction(N(:,:,2),'vars',[u,v,w]);
 
-                    obj.faceDOFs = size(F,2);
-                    obj.edgeDOFs = size(E,2);
+                    obj.faceDOFs = size(F,2)/4;
+                    obj.edgeDOFs = obj.degree+1;
                     obj.interiorDOFs = size(I,2);
                     N = NFunc;
                     curlN = curlFunc;
