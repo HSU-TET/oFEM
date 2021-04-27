@@ -18,9 +18,10 @@ classdef Dirichlet < handle & ofem_v2.boundary.FixedBoundary
 	%% Methodes
 	methods
 		function obj = Dirichlet(value, boundaryName, mesh)
-			obj.value = value;
-			
-			n = size(mesh.bd, 2);
+            
+            obj.value = value;
+            
+            n = size(mesh.bd, 2);
 			for i = 1:n
 				if isequal(mesh.bd{1,i},boundaryName)
 					obj.boundary = unique(sort(mesh.bd{2,i},2),'rows');
@@ -55,7 +56,7 @@ classdef Dirichlet < handle & ofem_v2.boundary.FixedBoundary
 			if isa(obj.value,'function_handle')
 				loco = physicalProblem.geometry.co(:,:,obj.nodes);
 				F = obj.value(loco);
-				obj.u = sparse(dofs,1,F,N,1);
+				obj.u = sparse(dofs,1,F(:),N,1);
 			else
 				obj.u = sparse(dofs,1,obj.value,N,1);
 			end

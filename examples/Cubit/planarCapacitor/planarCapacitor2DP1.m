@@ -1,11 +1,11 @@
 close all;
 clear;
-inp_file_name='test';
+inp_file_name='PlanarCapacitor';
 
 
 %% set constants
-U_1    = 0;
-U_2    = 1;
+U_1    = 1;
+U_2    = 0;
 
 eps1_r = 1; % Left
 eps2_r = 2; % Right
@@ -41,8 +41,9 @@ rightMat.epsilon = 5*rightMat.eps0;
 roomMat = ofem_v2.materials.Material();
 roomMat.epsilon = 5*roomMat.eps0;
 
-leftPlate = ofem_v2.boundary.Dirichlet(1,'LeftPlate',mesh);
-rightPlate = ofem_v2.boundary.Dirichlet(0,'RightPlate',mesh);
+leftPlate = ofem_v2.boundary.Dirichlet(@leftPlate,'LeftPlate',mesh);
+% leftPlate = ofem_v2.boundary.Dirichlet(U_1,'LeftPlate',mesh);
+rightPlate = ofem_v2.boundary.Dirichlet(U_2,'RightPlate',mesh);
 %testBD = ofem_v2.boundary.Dirichlet(2,'TestBD',mesh);
 
 mesh.setMaterial('LeftSide',leftMat);
@@ -115,7 +116,6 @@ mesh.export_UCD(fullfile(pwd,'PlanarCapcitor'),'export',{'U',u,'V'});
 % 
 % 
 % %% plot solution
-% figure;
-% h=op.plot(u);
-% set(h,'FaceColor', 'interp', 'EdgeColor', 'black');
-
+figure;
+h=ofem_v2.tools.plot(mesh,u,'V');
+set(h,'FaceColor', 'interp', 'EdgeColor', 'black');
