@@ -526,15 +526,28 @@ classdef Geometry < handle
                                                        obj.el(ss{1,i}{2,2},[2,3]);...
                                                        obj.el(ss{1,i}{2,3},[3,1])];
                                 end
+                                
+                                obj.bd{2,idx} = eID{:};
                         
                             case 'tet'
                                 for i=1:Nss
-                                    eID{i} = unique([obj.el2ed(ss{1,i}{2,1},[1,2,4]);...
+%                                     eID{i} = unique([obj.el2ed(ss{1,i}{2,1},[1,2,4]);...
+%                                                   obj.el2ed(ss{1,i}{2,2},[1,3,5]);...
+%                                                   obj.el2ed(ss{1,i}{2,3},[4,5,6]);...
+%                                                   obj.el2ed(ss{1,i}{2,4},[2,3,6])]);
+
+                                    eID{i} = [obj.el2ed(ss{1,i}{2,1},[1,2,4]);...
                                                   obj.el2ed(ss{1,i}{2,2},[1,3,5]);...
                                                   obj.el2ed(ss{1,i}{2,3},[4,5,6]);...
-                                                  obj.el2ed(ss{1,i}{2,4},[2,3,6])]);
+                                                  obj.el2ed(ss{1,i}{2,4},[2,3,6])];
+                                              
+                                    
+
+
                                 end
                                 
+                                [~,fID] = ismember(sort(eID{:},2),sort(obj.fa2ed,2),'rows');
+                                        obj.bd{2,idx} = obj.fa(fID,:);
                             otherwise
                                 error('ofem:mesh:dirichletEdges',...
                                       'Only Tetrahedron implemented so far!')
@@ -558,7 +571,7 @@ classdef Geometry < handle
                               'Something went horribly wrong!');
                 end
        
-                obj.bd{2,idx} = eID{:};
+%                 obj.bd{2,idx} = eID{:};
                 
             end
             

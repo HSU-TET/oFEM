@@ -8,9 +8,9 @@ close all;
 clear all; 
 
 %% Creating the geometry
-file = 'D:\GitHub\oFEM_rework\geometry\planarCapacitor3D';
+file = '/geometry/planarCapacitor3D';
 
-mesh= Geometry(); 
+mesh= ofem_v2.Geometry(); 
 mesh.load_from_msh(file);
 
 %% Choosing function space (Element type and order)

@@ -49,7 +49,7 @@ sideset 2 name "RightPlate"
 ################################# scheme and size ##################################################
 
 surf all scheme trimesh
-surf all size {mesh_size}
+#surf all size {mesh_size}
 
 #################################### mesh ##########################################################
 
@@ -61,10 +61,12 @@ mesh surf all
 
 ############################# save ###########################################################
 #
-export abaqus "/Users/nilskielian/Documents/GitHub/oFEM/examples/Cubit/test.inp" everything dimension 2 overwrite #cubitids
+export abaqus "/Users/nilskielian/Documents/GitHub/oFEM/examples/Cubit/PlanarCapacitor2D.inp" everything dimension 2 overwrite #cubitids
 #
 #
 #
+
+
 
 
 
