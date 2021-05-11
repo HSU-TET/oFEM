@@ -74,6 +74,15 @@ classdef Geometry < handle
         detD;
         Dk;
         
+        % mat is a cell array containing the materials the meshed model is
+        % build up from. Each entry in the array is a structure with a
+        % field name containing the name of the material. Dependent on the
+        % material there can be additional fields, all uppercase with
+        % whitespaces replaced by underscores, containing the desired
+        % property as, e.g., DENSITY. parts{2,:} containg the indices
+        % into mat.
+        mat;
+        
 
     end
     %% 
@@ -377,6 +386,247 @@ classdef Geometry < handle
                 
             end
             jacobiandata(obj);
+        end
+        
+        function info=load_from_inp(obj,inp_file_name)
+        % LOAD_FROM_INP(inp_file_name) loads the inp-file specified by
+        % inp_file_name into the ofem_v2.Geometry class.
+        %
+
+            % check if extension was specified
+            [filepath,filename,fileext] = fileparts(inp_file_name);
+            if isempty(fileext)
+                inp_file_name = fullfile(filepath,strcat(filename,'.inp'));
+            end
+            if isempty(filepath)
+                inp_file_name = fullfile(pwd,inp_file_name);
+            end
+
+            % check if inp file exists
+            if ~exist(inp_file_name,'file') % for whatever reason this fails on the cluster
+                error('ofem:mesh:FileNotFound','inp-file "%s" not found.\n',inp_file_name);
+            end
+
+            tic
+            inp=inp_read_file(inp_file_name);
+            obj.filetype = 'inp';
+            info.time.file_read=toc;
+
+            % inp is a cell array of the following structure
+            % inp{:,1}: coordinates
+            % inp{:,2}: elements
+            % inp{:,3}: nodesets
+            % inp{:,4}: sidesets
+            % inp{:,5}: properties
+            % inp{:,6}: materials
+
+            tic
+
+            %% coordinates
+            % size(obj.co)=[Nd,1,Nco], always column vectors
+            obj.co  = ofem_v2.tools.matrixarray(permute(inp{2,1}{2,1},[2,3,1]));
+            obj.Nco = size(obj.co,3);
+            obj.dim = size(obj.co,1);
+
+            %% elements
+            elaux  = inp{2,2};
+            %% parts
+            Nparts    = numel(elaux(1,:));
+            Nelems =0;
+            % ids       =cell(1,Nparts);
+            obj.parts = cell(3,Nparts);
+            obj.parts(1,:) = elaux(1,:);
+            
+            
+            for i =1:Nparts
+               % ids            = elaux{2,i}(:,1);
+                obj.el(elaux{2,i}(:,1),:)  = elaux{2,i}(:,2:end);
+                obj.parts{3,i} = elaux{2,i}(:,1);
+                Nelems         = Nelems + size(elaux{2,i},1);
+            end
+            
+%             
+%             obj.parts = cell(3,Nparts);
+% 
+%             set name
+%             obj.parts(1,:) = elaux(1,:);
+%             and indices
+%             max_idx=0;
+%             for i=1:Nparts
+%                 Nel            = size(elaux{2,i},1);
+%                 obj.parts{3,i} = max_idx+(1:Nel)';
+%                 max_idx        = max_idx+Nel;
+%             end
+            clear elaux; % ids;
+
+            %% element type
+            nodes_per_elem=size(obj.el,2);
+            switch obj.dim
+                case 1
+                    if nodes_per_elem~=2
+                        error('ofem:mesh:InvalidMesh',...
+                              'In 1D the elements are expected to contain two nodes, but %d nodes were found.',...
+                              nodes_per_elem);
+                    end
+                    obj.type = 'line';
+
+                case 2
+                    switch nodes_per_elem
+                        case 3
+                            obj.type = 'tri';
+                        case 4
+                            obj.type = 'quad';
+                        otherwise
+                            error('ofem:mesh:InvalidMesh',...
+                              'In 2D the elements are expected to contain three of four nodes, but %d nodes were found.',...
+                              nodes_per_elem);
+                    end
+
+                case 3
+                    switch nodes_per_elem
+                        case 4
+                            obj.type = 'tet';
+                        case 8
+                            obj.type = 'hex';
+                        otherwise
+                            error('ofem:mesh:InvalidMesh',...
+                              'In 3D the elements are expected to contain four of eight nodes, but %d nodes were found.',...
+                              nodes_per_elem);
+                    end
+            end
+
+            % post-processing
+            obj.jacobiandata;
+            obj.create_edges;
+            obj.create_faces;
+            obj.connectFa2Ed;
+            
+            %% nodesets
+%             bd_ns_name=inp{2,3};
+
+            %% sidesets
+            obj.bd=inp{2,4};
+           
+            % compute the edges for the specified boundary
+            for idx = 1:size(inp{2,4},2)
+                ss    = obj.bd(2,idx);
+                Nss   = size(ss,2);
+                eID   = cell(Nss,1);
+                switch obj.filetype
+                    case 'inp'
+                        switch obj.type
+                            
+                            case 'tri'
+                                for i=1:Nss
+%                                         eID{i}=unique([obj.el(ss{1,i}{2,1},[1,2]); ...
+%                                                        obj.el(ss{1,i}{2,2},[2,3]);...
+%                                                        obj.el(ss{1,i}{2,3},[3,1])],'stable');
+
+                                            eID{i}=[obj.el(ss{1,i}{2,1},[1,2]); ...
+                                                       obj.el(ss{1,i}{2,2},[2,3]);...
+                                                       obj.el(ss{1,i}{2,3},[3,1])];
+                                end
+                                
+                                obj.bd{2,idx} = eID{:};
+                        
+                            case 'tet'
+                                for i=1:Nss
+%                                     eID{i} = unique([obj.el2ed(ss{1,i}{2,1},[1,2,4]);...
+%                                                   obj.el2ed(ss{1,i}{2,2},[1,3,5]);...
+%                                                   obj.el2ed(ss{1,i}{2,3},[4,5,6]);...
+%                                                   obj.el2ed(ss{1,i}{2,4},[2,3,6])]);
+
+                                    eID{i} = [obj.el2ed(ss{1,i}{2,1},[1,2,4]);...
+                                                  obj.el2ed(ss{1,i}{2,2},[1,3,5]);...
+                                                  obj.el2ed(ss{1,i}{2,3},[4,5,6]);...
+                                                  obj.el2ed(ss{1,i}{2,4},[2,3,6])];
+                                              
+                                    
+
+
+                                end
+                                
+                                [~,fID] = ismember(sort(eID{:},2),sort(obj.fa2ed,2),'rows');
+                                        obj.bd{2,idx} = obj.fa(fID,:);
+                            otherwise
+                                error('ofem:mesh:dirichletEdges',...
+                                      'Only Tetrahedron implemented so far!')
+                        end
+                    case 'msh'
+                        ss    = ss{1};
+                        switch obj.type
+                            case 'tet'
+                                %ss = unique(sort(ss,2),'rows','legacy');
+                                ss = [ss(:,2),ss(:,1);ss(:,3),ss(:,2);ss(:,1),ss(:,3)];
+                                [~,idx] = ismember(ss,obj.ed,'rows');
+                                idx(idx==0) = [];
+                                eID{1} = idx;
+
+                            otherwise
+                                error('ofem:mesh:dirichletEdges',...
+                                      'Only Tetrahedron implemented so far!')
+                        end
+                    otherwise
+                        error('ofem:mesh:dirichletEdges',...
+                              'Something went horribly wrong!');
+                end
+       
+%                 obj.bd{2,idx} = eID{:};
+                
+            end
+            
+
+            %% materials
+            mataux=inp{2,6};
+            if isempty(mataux)
+              % if no material present => set air as default material
+              obj.mat{1}.name = 'air';
+              obj.mat{1}.ELASTIC = [0;0];
+              obj.mat{1}.DENSITY = 0.001;
+              obj.mat{1}.CONDUCTIVITY = 0;
+              obj.mat{1}.SPECIFIC_HEAT = 1.012;
+
+              for i=1:Nparts
+                obj.parts{2,i}=1;
+              end
+            else
+              % else read materials
+              Nmat=size(mataux,2);
+              obj.mat=cell(1,Nmat);
+              
+              for i=1:Nmat
+                obj.mat{i}.name=mataux{1,i};
+                Nmatpar=numel(mataux{2,i}(1,:));
+                for j=1:Nmatpar
+                  obj.mat{i}.(strrep(mataux{2,i}{1,j},' ','_'))=mataux{2,i}{2,j};
+                end
+                
+              end
+              clear mataux;
+              
+              % and associate them with the element sets
+              props=inp{2,5};
+              Nprops=numel(props(1,:));
+              
+              matnames = cellfun(@(c) c.name,obj.mat,'UniformOutput',0);
+              elnames  = obj.parts(1,:);
+              
+              for i=1:Nprops
+                elidx  = strcmp(props{2,i}{1},elnames );
+                matidx = find(strcmp(props{2,i}{2},matnames));
+                
+                obj.parts{2,elidx}=matidx;
+              end
+            end
+            
+            info.time.post_proccess=toc;
+
+            obj.Nint = size(obj.el,1);
+            
+            clear inp;
+            
+            
+            
         end
         
         function export_UCD(obj,folder_name,file_name,meta,varargin)

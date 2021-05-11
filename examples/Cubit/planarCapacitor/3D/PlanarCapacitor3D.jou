@@ -1,0 +1,75 @@
+reset
+
+################################ Variablen ####################################################
+
+ #{x_brick=1}
+ #{y_brick=1}
+ #{z_brick=1}
+
+ #{height_kondensator=0.2}
+ #{width_kondensator=0.2}
+
+#{relativ_permittivity_glas=1}
+#{relativ_permittivity_paper=1}
+
+#{mesh_size=1}
+################################ Modell ######################################################
+
+brick x {x_brick/2} y {y_brick} z {z_brick}
+move Volume 1  x {-x_brick/4}
+Volume 1  copy reflect x 
+
+
+
+############################## merge imprint ############################################################
+imprint  all
+merge  all
+
+############################ rename #############################################################
+vol 1 rename "LeftSide"
+vol 2  rename "RightSide"
+
+
+############################### Blocks ###########################################################
+
+block 1 LeftSide
+block 1 name 'LeftSide'
+
+block 2 RightSide
+block 2 name 'RightSide'
+
+
+############################# Nodesets #############################################################
+
+Sideset 1 add surf 4
+sideset 1 name "LeftPlate"
+
+Sideset 2 add surf 10
+sideset 2 name "RightPlate"
+
+################################# scheme and size ##################################################
+
+volume 1,2 scheme tetmesh
+volume 1,2 size {mesh_size}
+
+#################################### mesh ##########################################################
+
+mesh volume all
+#refine surf 2,3 numsplit 2 bias 2 depth 4 smooth
+
+################################## renumber elements ##################################
+#renumber element all start_id 1 uniqueids
+
+############################# save ###########################################################
+#
+export abaqus "/Users/nilskielian/Documents/GitHub/oFEM/examples/Cubit/PlanarCapacitor/3D/PlanarCapacitor3D.inp" everything dimension 3 overwrite #cubitids
+#
+#
+#
+
+
+
+
+
+
+
