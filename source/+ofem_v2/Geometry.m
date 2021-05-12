@@ -153,8 +153,7 @@ classdef Geometry < handle
             end
             obj.parts{4, partIndex} = force;
         end
-
-      
+    
         function reset(obj)
         %RESET reset the mesh to its initial configuration.
   %TODO is it realy to its inital coonfig?      
@@ -1231,6 +1230,21 @@ classdef Geometry < handle
                     error('ofem:mesh:Unspecified',...
                           'Unspecified error found');
             end
+        end
+        
+        function bary = barycentric_coordinates(obj,x,idx)
+            % BARYCENTRIC_COORDINATES returns the barycentric coordinates
+            % of points with coordinates x located in elements of index
+            % idx. x is suposed to be a matrixarray with the same structure
+            % as mesh.co. idx is an indexvector containing the element's
+            % numbers x is in.
+            if isempty(obj.DinvT)
+                obj.jacobiandata
+            end
+            
+            bary = obj.DinvT(:,:,idx)'*(x-obj.co(:,1,obj.el(idx,1)));
+            bary = [1-sum(bary,1); bary];
+            bary = double(permute(bary,[3,1,2]));
         end
         
         function reorderAC(obj)
