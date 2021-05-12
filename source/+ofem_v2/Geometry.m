@@ -20,7 +20,15 @@ classdef Geometry < handle
         % represent the respective edge. The ids are sorted in ascending
         % order.
         ed;
+        
+        % el2ed is a matrix (size(el,1),x) containing the element to edge 
+        % mapping. The vlaue of x is depending on the used element type.
+        % (e.g. for triangle x = 3, for tetrahedron x = 6).
+        % More precisely, each row contains the ids of the edges that
+        % belong to the element. The element id is equal to the row id.
 		el2ed;
+        
+        % Ned is the number of edges in the loaded mesh
 		Ned;
         
         % refTet switches between one of two reference tetrahedra for the
@@ -28,11 +36,30 @@ classdef Geometry < handle
         % elements, two reference tetrahedra have to be used
         refTet;
 		
-		fa;
+        % fa is a matrix containing the face to nodes mapping.
+        % More precisely, each row contains the ids of the nodes that
+        % represent the respective face. The ids are sorted in ascending
+        % order.		
+        fa;
+        
+        % el2fa is a matrix (size(el,1),y) containing the element to face 
+        % mapping. The vlaue of y is depending on the used element type.
+        % (e.g. for triangle y = 1, for tetrahedron y = 4).
+        % More precisely, each row contains the ids of the faces that
+        % belong to the element. The element id is equal to the row id.
 		el2fa;
+        
+        % Nfa is the number of faces within the loaded mesh.
 		Nfa;
 		
+        % fa2ed is a matrix (Nfa,z) containing the element to edge 
+        % mapping. The vlaue of z is depending on the used element type
+        % (e.g. for triangle and tetrahedron z = 3).
+        % More precisely, each row contains the ids of the edges that
+        % belong a face. The face id is equal to the row id.
 		fa2ed;
+        
+        % Nint is the number of elements within the loaded mesh.
 		Nint;
         
         % el is a matrix with dim+1=size(el,2) containing the
@@ -65,8 +92,12 @@ classdef Geometry < handle
 		% here regions of interest are stored
 		roi;
         
+        % type is the shape of the used elements (e.g. for triangles "tri",
+        % for tetrahedron "tet").
         type; 
 
+        % filetype is the file extension of the loaded mesh (e.g. for ABAQUS "inp", 
+        % for GMSH "msh".
         filetype;
         
         %Jacobian Data
@@ -298,6 +329,103 @@ classdef Geometry < handle
             obj.mat{1}.DENSITY = 0.001;
             obj.mat{1}.CONDUCTIVITY = 0;
             obj.mat{1}.SPECIFIC_HEAT = 1.012;
+        end
+        
+        function uniform_refine(obj)
+        %uniform_refine uniformly refines the mesh
+        %
+            
+            if isempty(obj.type)
+                error('ofem:mesh:InvalidMesh','ofem.mesh needs to hold a valid triangulation');
+            end
+
+            [obj.co,elem] = obj.create_midpoints();
+
+            obj.Nco = size(obj.co,3);
+
+            Nel = size(obj.el,1);
+
+            switch obj.type
+                case 'edge'
+                    %% edge
+                    % update elements
+                    obj.el = [         ...
+                        elem(:,[1,3]); ...
+                        elem(:,[3,2])  ...
+                        ];
+
+                    % update parts
+                    obj.parts(3,:)=cellfun(@(x) [x;x+Nel],obj.parts(3,:),'UniformOutput',false);
+
+                    % update boundaries
+                    for i=1:numel(obj.bd(2,:))
+                        obj.bd{2,i}{2,2}=obj.bd{2,i}{2,2}+Nel;
+                    end
+
+                case 'tri'
+                    %% triangle
+                    % update elements
+                    obj.el = [ ...
+                        elem(:,[1,4,6]); ...
+                        elem(:,[4,2,5]); ...
+                        elem(:,[6,5,3]); ...
+                        elem(:,[4,5,6])  ...
+                        ];
+
+                    % update parts
+                    obj.parts(3,:)=cellfun(@(x) [x;x+Nel;x+2*Nel;x+3*Nel],obj.parts(3,:),'UniformOutput',false);
+
+                    % update boundaries
+                    for i=1:numel(obj.bd(2,:))
+                        obj.bd{2,i}{2,1}=[obj.bd{2,i}{2,1}      ; obj.bd{2,i}{2,1}+  Nel];
+                        obj.bd{2,i}{2,2}=[obj.bd{2,i}{2,2}+  Nel; obj.bd{2,i}{2,2}+2*Nel];
+                        obj.bd{2,i}{2,3}=[obj.bd{2,i}{2,3}+2*Nel; obj.bd{2,i}{2,3}      ];
+                    end
+
+                case 'quad'
+                    %% quadrilateral
+                    error('ofem:mesh:NotImplemented',...
+                          'Quadrilateral meshes not supported so far!');
+
+                case 'tet'
+                    %% tetrahedron
+                    %update elements
+                    obj.el = [ ...
+                        elem(:,[1,5, 6, 7]); ...
+                        elem(:,[5,2, 8, 9]); ...
+                        elem(:,[6,8, 3,10]); ...
+                        elem(:,[7,9,10, 4]); ...
+                        elem(:,[7,5, 6, 9]); ...
+                        elem(:,[5,8, 6,10]); ...
+                        elem(:,[6,8,10, 9]); ...
+                        elem(:,[7,9, 6,10]); ...
+                        ];
+
+                    % update parts
+                    obj.parts(3,:)=cellfun(@(x) [x;x+Nel;x+2*Nel;x+3*Nel;x+4*Nel;x+5*Nel;x+6*Nel;x+7*Nel],obj.parts(3,:),'UniformOutput',false);
+
+                    % update boundaries
+                    % S1: 1, 2, 3
+                    % S2: 1, 2, 4
+                    % S3: 2, 3, 4
+                    % S4: 1, 3, 4
+                    for i=1:numel(obj.bd(2,:))
+                        obj.bd{2,i}{2,1}=[obj.bd{2,i}{2,1}      ; obj.bd{2,i}{2,1}+1*Nel; obj.bd{2,i}{2,1}+2*Nel; obj.bd{2,i}{2,1}+5*Nel];
+                        obj.bd{2,i}{2,2}=[obj.bd{2,i}{2,2}      ; obj.bd{2,i}{2,2}+1*Nel; obj.bd{2,i}{2,2}+3*Nel; obj.bd{2,i}{2,2}+4*Nel];
+                        obj.bd{2,i}{2,3}=[obj.bd{2,i}{2,3}+1*Nel; obj.bd{2,i}{2,3}+2*Nel; obj.bd{2,i}{2,3}+3*Nel; obj.bd{2,i}{2,3}+6*Nel];
+                        obj.bd{2,i}{2,4}=[obj.bd{2,i}{2,4}      ; obj.bd{2,i}{2,4}+2*Nel; obj.bd{2,i}{2,4}+3*Nel; obj.bd{2,i}{2,4}+7*Nel];
+                    end
+
+                case 'hex'
+                    %% hexahedron
+                    error('ofem:mesh:NotImplemented',...
+                          'Hexahedral meshes not supported so far!');
+
+                otherwise
+                    error('ofem:mesh:Unspecified',...
+                          'Unspecified error found');
+            end
+
         end
 
         function load_from_msh(obj,msh_file_name)
@@ -887,7 +1015,8 @@ classdef Geometry < handle
                     error('ofem:mesh:Unspecified',...
                           'Unspecified error found');
             end
-		end
+        end
+        
 		function create_edges(obj)
         %CREATE_EDGES creates edges information and element to edges mapping
         %
@@ -952,7 +1081,6 @@ classdef Geometry < handle
             obj.Ned = size(obj.ed,1);
         end
         
-        %%
         function create_faces(obj)
         %CREATE_FACES creates faces information and element to faces mapping
         %
@@ -1015,6 +1143,94 @@ classdef Geometry < handle
 			[~,obj.fa2ed(:,1)] = ismember(ed1,edlist,'rows');
 			[~,obj.fa2ed(:,2)] = ismember(ed2,edlist,'rows');
 			[~,obj.fa2ed(:,3)] = ismember(ed3,edlist,'rows');
+        end
+        
+        function [co,el]=create_midpoints(obj)
+            Nel=numel(obj.el(:,1));
+            
+            co = obj.co;
+
+            switch obj.type
+                case 'edge'
+                    %% edge
+                    % create new nodes
+                    co2 = (obj.co(:,:,obj.el(:,1))+obj.co(:,:,obj.el(:,2)))/2;
+                    co2 = permute(co2,[3,1,2]); % coordinate per row
+                    
+                    % get rid of doubles
+                    [co2,~,ib]=unique(co2,'rows','stable');
+                    
+                    % add new indices
+                    Nco2    = size(co2,1);
+                    idx2    = obj.Nco+(1:Nco2);
+                    
+                    % extend nodes
+                    co(:,:,end+1:end+Nco2) = permute(co2,[2,3,1]);
+                    
+                    % append new nodes to elements
+                    el=[obj.el, reshape(idx2(ib),Nel,[])];
+                    
+                case 'tri'
+                    %% triangle
+                    % create new nodes
+                    mpt1 = permute(obj.co(:,:,obj.el(:,1))+obj.co(:,:,obj.el(:,2)),[3,1,2]);
+                    mpt2 = permute(obj.co(:,:,obj.el(:,2))+obj.co(:,:,obj.el(:,3)),[3,1,2]);
+                    mpt3 = permute(obj.co(:,:,obj.el(:,3))+obj.co(:,:,obj.el(:,1)),[3,1,2]);
+                    
+                    co2 = [ mpt1;  mpt2;  mpt3 ]/2;
+                    
+                    % get rid of doubles
+                    [co2,~,ib]=unique(co2,'rows','stable');
+                    
+                    % add new indices
+                    Nco2    = size(co2,1);
+                    idx2=obj.Nco+(1:Nco2);
+                    
+                    % extend nodes
+                    co(:,:,end+1:end+Nco2) = permute(co2,[2,3,1]);
+                    
+                    % append new nodes to elements
+                    el=[obj.el, reshape(idx2(ib),Nel,[])];
+                    
+                case 'quad'
+                    %% quadrilateral
+                    error('ofem:mesh:NotImplemented',...
+                          'Quadrilateral meshes not supported so far!');
+                    
+                case 'tet'
+                    %% tetrahedron
+                    % create new nodes
+                    mpt1 = permute(obj.co(:,:,obj.el(:,1))+obj.co(:,:,obj.el(:,2)),[3,1,2]);
+                    mpt2 = permute(obj.co(:,:,obj.el(:,1))+obj.co(:,:,obj.el(:,3)),[3,1,2]);
+                    mpt3 = permute(obj.co(:,:,obj.el(:,1))+obj.co(:,:,obj.el(:,4)),[3,1,2]);
+                    mpt4 = permute(obj.co(:,:,obj.el(:,2))+obj.co(:,:,obj.el(:,3)),[3,1,2]);
+                    mpt5 = permute(obj.co(:,:,obj.el(:,2))+obj.co(:,:,obj.el(:,4)),[3,1,2]);
+                    mpt6 = permute(obj.co(:,:,obj.el(:,3))+obj.co(:,:,obj.el(:,4)),[3,1,2]);
+                    
+                    co2 = [ mpt1; mpt2; mpt3; mpt4; mpt5; mpt6 ]/2;
+                    
+                    % get rid of doubles
+                    [co2,~,ib]=unique(co2,'rows','stable');
+                    
+                    % add new indices
+                    Nco2    = size(co2,1);
+                    idx2=obj.Nco+(1:Nco2);
+                    
+                    % extend nodes
+                    co(:,:,end+1:end+Nco2) = permute(co2,[2,3,1]);
+                    
+                    % append new nodes to elements
+                    el=[obj.el, reshape(idx2(ib),Nel,[])];
+                    
+                case 'hex'
+                    %% hexahedron
+                    error('ofem:mesh:NotImplemented',...
+                          'Hexahedral meshes not supported so far!');
+                    
+                otherwise
+                    error('ofem:mesh:Unspecified',...
+                          'Unspecified error found');
+            end
         end
         
         function reorderAC(obj)
