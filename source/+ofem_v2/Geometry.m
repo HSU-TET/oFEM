@@ -1291,6 +1291,23 @@ classdef Geometry < handle
             obj.refTet = double(obj.el(:,2)>obj.el(:,3))+1;
             
         end
+        
+        function h=show(obj)
+            switch obj.type
+             
+                case 'tri'
+                    % triangle
+                    h=trimesh(obj.el,obj.co(1,1,:),obj.co(2,1,:));
+             
+                case 'tet'
+                    % tetrahedron
+                    h=tetramesh(obj.el,double(permute(obj.co,[3,1,2])),'FaceAlpha',0.1);
+ 
+                otherwise
+                    error('ofem:mesh:show:Unspecified',...
+                          'Unspecified error found');
+            end
+        end 
      
     end
 end

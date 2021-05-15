@@ -32,6 +32,7 @@ classdef H1Element < ofem_v2.elements.Finite_Elements & handle
 			obj.degree = deg;
 			obj.degreeMass = deg;
 			obj.degreeStiff = deg;
+            obj.shape_function = 'H1';
 		end
 		
 		function [phi,dPhi] = computeBasis(obj)
