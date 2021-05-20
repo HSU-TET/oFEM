@@ -57,7 +57,6 @@ classdef Physical_Problem < handle
         end
         
         function setBoundaryCondition(obj, BC)
-            n= size(obj.geometry.bd, 2);
             obj.geometry.bd{3,BC.index} = BC;
         end
         
