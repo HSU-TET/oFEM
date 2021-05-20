@@ -22,10 +22,11 @@ classdef Robin < handle & ofem_v2.boundary.MixedBoundary
 	end
 	
 	methods
-		function obj=Robin(value, alpha, feBd, boundaryName, mesh)
+		function obj=Robin(value, alpha, beta, feBd, boundaryName, mesh)
 			obj.value = value;
 			obj.feBd = feBd;
 			obj.alpha = alpha;
+			obj.beta = beta;
 			
 			n = size(mesh.bd, 2);
 			for i = 1:n
@@ -103,7 +104,7 @@ classdef Robin < handle & ofem_v2.boundary.MixedBoundary
 				end
 			end
 			
-			F = F*obj.meas;
+			F = F*obj.meas*obj.beta;
 			I = obj.boundary';
 			obj.b = sparse(I(:),1,F(:),N,1);
 			b = obj.b;
