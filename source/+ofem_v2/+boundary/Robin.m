@@ -16,6 +16,7 @@ classdef Robin < handle & ofem_v2.boundary.MixedBoundary
 		faces;
 		elems;
 		alpha;
+		beta;
 		
 		M;
 		b;
