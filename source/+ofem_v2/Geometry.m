@@ -140,8 +140,8 @@ classdef Geometry < handle
         end
         
         function setForce(obj, partName, force)
-            if isscalar(partname)
-                partIndex = partname;
+            if isscalar(partName)
+                partIndex = partName;
             else
                 [~, number_colums] = size(obj.parts);
                 for i= 1:number_colums
