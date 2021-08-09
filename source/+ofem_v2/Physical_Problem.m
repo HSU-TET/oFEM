@@ -180,78 +180,84 @@ classdef Physical_Problem < handle
                         
                     switch obj.geometry.dim
                         case 2
-                            % d denotes the dimension of polynomial space,
-                            % i.e. for P1 elements it is 1
-                            d=1;             % degree of finite element space
-                            m=(d+2)*(d+3)/2; % polynomial degree of approximant
-                            Ndof = size(obj.mesh.co,3);
+                            %d denotes the dimension of polynomial space,
+                            %i.e. for P1 elements it is 1
+                            d = 1;             % degree of finite element space
+                            m = (d+2)*(d+3)/2; % polynomial degree of approximant
+                            n = (d+3)*(d+4)/2; % degree of point considering for least-squares
 
-                            % statistics and machine learning toolbox
-                            co = double(squeeze(obj.mesh.co))';
-                            I  = obj.mesh.el(:,[1 1 2 2 3 3]);
-                            J  = obj.mesh.el(:,[2 3 1 3 1 2]);
-                            h  = co(I,:)-co(J,:); h=sqrt(dot(h,h,2));
-                            h  = accumarray(I(:),h(:),[],@max,[],true);
-                            ht = full(h);
-                            Di = pdist2(co,co);
-                            while 1
-                                idx  = Di<repmat(ht,1,Ndof);
-                                idx2 = sum(idx,2)<m;
-                                if ~any(idx2)
-                                    break;
-                                end
-                                ht(idx2)=ht(idx2)+h(idx2);
+                            co   = double(squeeze(obj.geometry.co))'; 
+                            Ndof = size(co,1);
+                            
+                            if Ndof < n
+                                    error('Mesh too coarse to compute gradient. Please refine it.');
                             end
-                            clear I J idx2 maxR maxRt D;
+                            
+                            co_idx = knnsearch(co,co,'K',n)';
 
-                            ui_r=zeros(6,1,Ndof);
-                            for i=1:Ndof
-                                idxl        = find(idx(i,:));
-                                ui          = u (idxl  );
-                                xi          = co(idxl,1);
-                                yi          = co(idxl,2);
-                                A           = [ones(numel(idxl),1), xi, yi, xi.*yi, xi.^2, yi.^2];
-                                ui_r(:,:,i) = A\ui;
-                            end
+                            ui1 = reshape(u (co_idx(:)  ),n,1,[]);
+                            xi1 = reshape(co(co_idx(:),1),n,1,[]);
+                            yi1 = reshape(co(co_idx(:),2),n,1,[]);
 
-%                         n=(d+3)*(d+4)/2; % degree of point considering for least-squares
-%                         co_idx = knnsearch(co,co,'K',n)';
+                            ui = u(co_idx(:));
+                            xi = squeeze(obj.geometry.co(1, :, co_idx(:)));
+                            yi = squeeze(obj.geometry.co(2, :, co_idx(:)));
+
+                            clear co_idx;
+
+                            A = [ones(n*Ndof,1), xi, yi, xi.*yi, xi.^2, yi.^2];                    
+
+                            ui_r = cellfun(@(A,b) A\b      , ...
+                                            mat2cell(A ,n*ones(1,Ndof),m), ...
+                                            mat2cell(ui,n*ones(1,Ndof),1), ...
+                                            'UniformOutput',false);
+                            ui_r = reshape(cell2mat(ui_r),m,[])';
+
+                            x = co(:,1);
+                            y = co(:,2);
+
+                            grad = [ ui_r(:,2)+ui_r(:,4).*y+2*ui_r(:,5).*x, ...
+                                     ui_r(:,3)+ui_r(:,4).*x+2*ui_r(:,6).*y ];
+
+                              % DEVELOPMENT statistics and machine learning toolbox
+%                             co = double(squeeze(obj.geometry.co))';
+%                             I  = obj.geometry.el(:,[1 1 2 2 3 3]);
+%                             J  = obj.geometry.el(:,[2 3 1 3 1 2]);
+%                             h  = co(I,:)-co(J,:); h=sqrt(dot(h,h,2));
+%                             h  = accumarray(I(:),h(:),[],@max,[],true);
+%                             ht = full(h);
+%                             Di = pdist2(co,co);
+%                             while 1
+%                                 idx  = Di<repmat(ht,1,Ndof);
+%                                 idx2 = sum(idx,2)<m;
+%                                 if ~any(idx2)
+%                                     break;
+%                                 end
+%                                 ht(idx2)=ht(idx2)+h(idx2);
+%                             end
+%                             clear I J idx2 maxR maxRt D;
 % 
-%                         ui = reshape(u (co_idx(:)  ),n,1,[]);
-%                         xi = reshape(co(co_idx(:),1),n,1,[]);
-%                         yi = reshape(co(co_idx(:),2),n,1,[]);
-%                         
-%                         clear co_idx;
+%                             ui_r=zeros(6,1,Ndof);
+%                             for i=1:Ndof
+%                                 idxl        = find(idx(i,:));
+%                                 ui          = u (idxl  );
+%                                 xi          = co(idxl,1);
+%                                 yi          = co(idxl,2);
+%                                 A           = [ones(numel(idxl),1), xi, yi, xi.*yi, xi.^2, yi.^2];
+%                                 ui_r(:,:,i) = A\ui;
+%                             end
 % 
-%                         A = [ones(n,1,Ndof), xi, yi, xi.*yi, xi.^2, yi.^2];
+%                             x = obj.geometry.co(1,:,:);
+%                             y = obj.geometry.co(2,:,:);
 % 
-%                         ui_r=zeros(6,1,Ndof);
-%                         for i=1:Ndof
-%                             ui_r(:,:,i) = A(:,:,i)\ui(:,:,i);
-%                         end
+%                             grad = [ ui_r(2,:,:)+ui_r(4,:,:).*y+2*ui_r(5,:,:).*x, ...
+%                                  ui_r(3,:,:)+ui_r(4,:,:).*x+2*ui_r(6,:,:).*y ];
+% 
+%                             grad = reshape(grad,2,[])';                                 
 
-                            x = obj.mesh.co(1,:,:);
-                            y = obj.mesh.co(2,:,:);
-
-                            grad = [ ui_r(2,:,:)+ui_r(4,:,:).*y+2*ui_r(5,:,:).*x, ...
-                                     ui_r(3,:,:)+ui_r(4,:,:).*x+2*ui_r(6,:,:).*y ];
-
-                            grad = reshape(grad,2,[])';
-
-%                         ui_r = cellfun(@(A,b) A\b      , ...
-%                             mat2cell(A ,n*ones(1,Ndof),m), ...
-%                             mat2cell(ui,n*ones(1,Ndof),1), ...
-%                             'UniformOutput',false);
-%                         ui_r = reshape(cell2mat(ui_r),m,[])';
-%                         
-%                         clear A;
-%                         
-%                         x = co(:,1);
-%                         y = co(:,2);
-%                         
-%                         grad = [ ui_r(:,2)+ui_r(:,4).*y+2*ui_r(:,5).*x, ...
-%                                  ui_r(:,3)+ui_r(:,4).*x+2*ui_r(:,6).*y ];
-                        
+                            
+                    
+                    
                         case 3
                             % d denotes the dimension of polynomial space,
                             % i.e. for P1 elements it is 1
@@ -303,7 +309,7 @@ classdef Physical_Problem < handle
 %                               'Reconstruction of P2 gradient not implemented, yet!');
             end
         end
-        
+  
         function solve(obj)
             %DOFs = obj.DOFs.getDOFs;
             dofs = obj.DOFs.freeDOFs;
