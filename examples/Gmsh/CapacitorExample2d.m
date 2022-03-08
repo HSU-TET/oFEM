@@ -8,19 +8,24 @@ close all;
 clear all; 
 
 %% Creating the geometry
-file = 'CapacitorExample2d';
+file = './geometry/CapacitorExample2d';
 
-mesh= Geometry(); 
+mesh= ofem_v2.Geometry(); 
 mesh.load_from_msh(file);
+mesh.create_edges;
 
 %% Choosing function space (Element type and order)
-element = P1Element(mesh); 
+%element = ofem_v2.elements.H1Element(2,1); 
+element = ofem_v2.elements.loadFE('H1_2D_Order_1');
+
+dofs = ofem_v2.DOFHandler(mesh);
+dofs.attach(element);
 
 %% Creating Material Classes
-paper = Material(); 
+paper = ofem_v2.materials.Material(); 
 paper.epsilon = 0.0001;
 
-glas = Material();
+glas = ofem_v2.materials.Material();
 glas.epsilon = 0.0005; 
 
 %% Modeling the Physical Problem
@@ -28,30 +33,38 @@ glas.epsilon = 0.0005;
 % Dirichlet Boundary Conditions
 
 %objName = Constructor(Element, Geometry, has_Stiffness, has_Mass, has_Damping)
-capacitor = Physical_Problem(element, mesh, 1,0,0);
+capacitor = ofem_v2.Physical_Problem(element, mesh, 1,0,0);
+capacitor.attachDOFHandler(dofs)
 
 % assign material to the parts of the geometry
-paper.setMaterial(capacitor, 'Paper');
-glas.setMaterial(capacitor, 'Glas');
+%paper.setMaterial(capacitor, 'Paper');
+%glas.setMaterial(capacitor, 'Glas');
+
+mesh.setMaterial('Paper', paper);
+mesh.setMaterial('Glas', glas)
 
 % specify which parameter is neccesarry for which Matrix
-capacitor.chooseParameter('Paper',paper.epsilon, 'stiffness');
-capacitor.chooseParameter('Glas', glas.epsilon, 'stiffness');
+%capacitor.chooseParameter('Paper',paper.epsilon, 'stiffness');
+%capacitor.chooseParameter('Glas', glas.epsilon, 'stiffness');
+capacitor.setParaS('epsilon');
+
 
 % create Boundary conditions
-leftPlate = DirichletBC(0, 'left', mesh); % 0V Potential on the left plate
-rightPlate = DirichletBC(5, 'right', mesh); % 5V Potential on the right plate
+leftPlate = ofem_v2.boundary.Dirichlet(0, 'left', mesh); % 0V Potential on the left plate
+rightPlate = ofem_v2.boundary.Dirichlet(5, 'right', mesh); % 5V Potential on the right plate
 
 % assign to the Problem
 capacitor.setBoundaryCondition(leftPlate);
 capacitor.setBoundaryCondition(rightPlate);
+
+dofs.generateDOFs;
 
 %% Assembly of the matrices and solving the equation
 capacitor.assemble(); 
 capacitor.solve(); 
 
 %% Exporting the Data
-mesh.export_UCD([pwd,'/export'],['export'],{'U',capacitor.u,''});
+mesh.export_UCD([pwd,'/export'],['2dCapacitor'],{'U',capacitor.u,''});
 
 
 

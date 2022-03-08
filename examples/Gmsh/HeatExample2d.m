@@ -6,18 +6,23 @@ close all;
 clear all; 
 
 %% Creating the geometry
-file = 'D:\GitHub\oFEM_rework\geometry\planarCapacitor3D';
+file = '.\geometry\HeatExample2d';
 %file = 'HeatExample2D';
 
 
-mesh= Geometry(); 
+mesh= ofem_v2.Geometry(); 
 mesh.load_from_msh(file);
+mesh.create_edges;
+mesh.create_faces;
+mesh.connectFa2Ed;
 
 %% Choosing function space (Element type and order)
-element = P1Element(mesh); 
+element = ofem_v2.elements.loadFE('H1_2D_Order_1');
+dofs = ofem_v2.DOFHandler(mesh);
+dofs.attach(element);
 
 %% Creating Material Classes
-steel = Material(); 
+steel = ofem_v2.materials.Material(); 
 steel.lambda= 48;
 steel.c = 120;
 
@@ -27,19 +32,18 @@ steel.c = 120;
 % Dirichlet Boundary Conditions and 2 Neumann Conditions
 
 %objName = Constructor(Element, Geometry, has_Stiffness, has_Mass, has_Damping)
-heat = Physical_Problem(element, mesh, 1, 1,0);
+heat = ofem_v2.Physical_Problem(element, mesh, 1, 1,0);
+heat.attachDOFHandler(dofs);
 
 % assign material to the parts of the geometry
-steel.setMaterial(heat, 'Steel');
-
+mesh.setMaterial('Steel',steel);
 
 % specify which parameter is neccesarry for which Matrix
-heat.chooseParameter('Steel',steel.lambda, 'stiffness');
-heat.chooseParameter('Steel', steel.c, 'mass');
-
+heat.setParaS('lambda');
+heat.setParaM('c');
 
 % create Boundary conditions
-rightPlate = DirichletBC(400, 'HighTemp', mesh);
+rightPlate = ofem_v2.boundary.Dirichlet(400, 'HighTemp', mesh);
 
 %surface = NeumannBC(11, 'Boundary', mesh);
 
@@ -48,13 +52,14 @@ heat.setBoundaryCondition(rightPlate);
 %heat.setBoundaryCondition(surface);
 
 % set initial conditions 
-init = Initial_Condition(280);
+init =  ofem_v2.Initial_Condition(280);
 
+dofs.generateDOFs;
 
 %% Assembly of the matrices and solving the equation
 heat.assemble(); 
 
 
 %% Solving and Exporting the Data
-heat.parabolic_solve(init, 100, 1); 
+heat.parabolic_solve(init, 100, 1,'/export/heat/','step'); 
 

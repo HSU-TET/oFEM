@@ -13,7 +13,7 @@ Physical Volume("M:LeftCap") = 1;
 Physical Volume("M:RightCap") = 2; 
 Coherence;
 Physical Surface("BD:LeftDirichlet")= 1; 
-Physical Surface("BD:RightDirichlet")= 8; 
+Physical Surface("BD:RightDirichlet")= 7; 
 Coherence;
 
 Characteristic Lenght{:} = hight/10;

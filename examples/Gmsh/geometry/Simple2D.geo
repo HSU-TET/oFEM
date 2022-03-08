@@ -33,7 +33,7 @@ Point{p} In Surface{2};
 
 Characteristic Length{PointsOf{Surface{2,3};}} = 0.0005;
 Characteristic Length{PointsOf{Surface{1};} = 0.01;
-Characteristic Length{p} = 0.01;
+Characteristic Length{p} = 0.001;
 
 //Characteristic Length {:} = 0.001;
 Mesh 2; 

@@ -317,19 +317,19 @@ classdef Physical_Problem < handle
             
         end
         
-        function parabolic_solve(obj, init, timesteps, deltaTime)
+        function parabolic_solve(obj, init, timesteps, deltaTime,folder,file)
             
             %           Passt das so ?berhaupt?!
             dofs = obj.DOFs.freeDOFs;
             obj.u(dofs)= init.value;
             dt= deltaTime;
             n = timesteps;
-			obj.geometry.export_UCD([pwd, '/export'],['export',num2str(0)], {'T', obj.u, ''});
+			obj.geometry.export_UCD([pwd, folder],[file,num2str(0)], {'T', obj.u, ''});
             for i = 1:n
                 b2 = obj.b+obj.M/dt*obj.u;
                 obj.u(dofs) = (obj.S(dofs,dofs)+obj.M(dofs,dofs)/dt+obj.M_robin(dofs,dofs))\b2(dofs); % change something
                 
-                obj.geometry.export_UCD([pwd, '/export'],['export',num2str(i)], {'T', obj.u, ''});
+                obj.geometry.export_UCD([pwd, folder],[file,num2str(i)], {'T', obj.u, ''});
             end
         end
         

@@ -6,7 +6,7 @@
 %                       Nerves completely ignored. 
 %https://itis.swiss/virtual-population/tissue-properties/database/dielectric-properties/
 close all;
-clear all; 
+clear; 
 
 %% Defining Variables
 PotentialLeft = 0; %[V]
@@ -15,48 +15,58 @@ PotentialRight = 1; %[V]
 %% Importing the Geometry
 fileLeg = [pwd,'\geometry\leg3D']; 
 
-mesh = Geometry(); 
+mesh = ofem_v2.Geometry(); 
 mesh.load_from_msh(fileLeg);
+mesh.create_edges;
+mesh.create_faces;
+mesh.connectFa2Ed;
 
 %% Choose function Space
-element = P1Element(mesh); 
+element = ofem_v2.elements.loadFE('H1_3D_Order_1');
+dh = ofem_v2.DOFHandler(mesh);
+dh.attach(element);
 
 %% Setting up the Model Problem 
 % electro quasi steady:
-Voltkappa = Physical_Problem(element, mesh, 1,0,0);
-Voltepsilon = Physical_Problem(element, mesh, 1,0,0);
-%% Boundary Condition
-leftElectrode = DirichletBC(PotentialLeft, 'leftElectrode', mesh); 
-rightElectrode = DirichletBC(PotentialRight, 'rightElectrode', mesh); 
+leg = ofem_v2.Physical_Problem(element, mesh, 1,0,0);
+leg.attachDOFHandler(dh);
 
-Voltkappa.setBoundaryCondition(leftElectrode);
-Voltkappa.setBoundaryCondition(rightElectrode);
-Voltepsilon.setBoundaryCondition(leftElectrode);
-Voltepsilon.setBoundaryCondition(rightElectrode);
+%% Boundary Condition
+leftElectrode = ofem_v2.boundary.Dirichlet(PotentialLeft, 'leftElectrode', mesh); 
+rightElectrode = ofem_v2.boundary.Dirichlet(PotentialRight, 'rightElectrode', mesh); 
+
+leg.setBoundaryCondition(leftElectrode);
+leg.setBoundaryCondition(rightElectrode);
+
 %% Setting up the Material
 
+dt = 1e-6;
 e0 = 8.8541878176E-12;
-blood = Material();
+blood = ofem_v2.materials.Material();
 blood.epsilon = 5.20E+3*e0;
 blood.kappa = 7.01E-1; 
+blood.stiff = blood.kappa + blood.epsilon/dt;
 
-muscle = Material(); 
+muscle = ofem_v2.materials.Material(); 
 muscle.epsilon =1.01E+4*e0; 
-muscle.kappa = 3.52E-1; 
+muscle.kappa = 3.52E-1;
+muscle.stiff = muscle.kappa + muscle.epsilon/dt;
 
-bone = Material(); % Parameter of Cortical bone
+bone = ofem_v2.materials.Material(); % Parameter of Cortical bone
 bone.epsilon =2.64E+2*e0;
-bone.kappa =2.06E-2; 
+bone.kappa =2.06E-2;
+bone.stiff = bone.kappa + bone.epsilon/dt;
 
-skin = Material(); 
+skin = ofem_v2.materials.Material(); 
 skin.epsilon = 1.13E+3*e0; 
-skin.kappa =2.73E-4; 
+skin.kappa =2.73E-4;
+skin.stiff = skin.kappa + skin.epsilon/dt;
 
-fat = Material();
+fat = ofem_v2.materials.Material();
 fat.epsilon =1.63E+2*e0; 
-fat.kappa =4.33E-2; 
-
-dt = 1e-6; 
+fat.kappa =4.33E-2;
+fat.stiff = fat.kappa + fat.epsilon/dt;
+ 
 % mesh.setMaterial(blood)  // steckt das mat zum part
 % Voltkappa.setParaS('kappa');
 mesh.setMaterial('Blood',blood);
@@ -65,36 +75,39 @@ mesh.setMaterial('Muscle',muscle);
 mesh.setMaterial('Bone',bone);
 mesh.setMaterial('Fat',fat);
 
-Voltkappa.setParaS('kappa');
-Voltepsilon.setParaS('epsilon');
+leg.setParaS('stiff');
+
+dh.generateDOFs;
 
 %% Assembly of the matrices
-Voltkappa.assemble(); 
-Voltepsilon.assemble();
+leg.assemble(); 
+
+dofs = dh.freeDOFs;
 
 %% Test- Solving as Elliptic Problem
-u_init= Initial_Condition(0);
+u_init= ofem_v2.Initial_Condition(0);
 % functions ones is not working
-u_i = zeros(mesh.Nco,1);
-u_i(Voltkappa.dof) = u_init.value;  %Maximum variable size allowed by the program is exceeded.
+u_i = sparse(zeros(mesh.Nco,1));
+u_i(dofs) = u_init.value;  %Maximum variable size allowed by the program is exceeded.
 n = 100;
 
 %A = Voltkappa.S + Voltepsilon.S/dt; %Kappa halbe?!
-A = Voltkappa.S + Voltepsilon.S/dt;
+%A = leg.S + Voltepsilon.S/dt;
+S = leg.S;
 
-L = ichol(A(Voltkappa.dof,Voltkappa.dof));
-b_diri = zeros(mesh.Nco,1);
+L = ichol(S(dofs,dofs));
+b_diri = sparse(zeros(mesh.Nco,1));
 
 % Testing if the puls makes problems: 
 for i =1:n+1
     u_imin1 = u_i;
     p=pulse(i*dt);
     %b_diri = ones(mesh.Nco,1)*pulse(i*dt);
-	b_diri(leftElectrode.boundary) = pulse(i*dt);
+	b_diri(leftElectrode.nodes) = pulse(i*dt);
 	u_i = b_diri;
-	b_diri = A*b_diri;
-    b = -b_diri+Voltepsilon.S/dt * u_imin1;  % ./ !?
-    u_i(Voltepsilon.dof) = cgs(A(Voltepsilon.dof,Voltepsilon.dof),b(Voltepsilon.dof),1e-7,1000,L,L');
+	b_diri = S*b_diri;
+    b = -b_diri+S * u_imin1;  % ./ !?
+    u_i(dofs) = cgs(S(dofs,dofs),b(dofs),1e-7,1000,L,L');
     
 	mesh.export_UCD([pwd, '/exportLeg'],['exportLeg3D',num2str(i-1)], {'u', u_i, ''});
     

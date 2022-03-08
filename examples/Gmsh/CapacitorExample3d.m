@@ -40,8 +40,8 @@ capacitor = ofem_v2.Physical_Problem(fe, mesh, 1,0,0);
 capacitor.attachDOFHandler(dofs);
 
 % assign material to the parts of the geometry
-paper.setMaterial(capacitor, 'LeftCap');
-glas.setMaterial(capacitor, 'RightCap');
+mesh.setMaterial('LeftCap',paper);
+mesh.setMaterial('RightCap',glas);
 
 % specify which parameter is neccesarry for which Matrix
 capacitor.setParaS('epsilon');
@@ -60,7 +60,7 @@ capacitor.assemble();
 capacitor.solve(); 
 
 %% Exporting the Data
-mesh.export_UCD([pwd,'/export'],['exportCap3D'],{'U',capacitor.u,''});
+mesh.export_UCD([pwd,'/export'],['3DCapacitor'],{'U',capacitor.u,''});
 
 
 
