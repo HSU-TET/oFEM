@@ -8,19 +8,27 @@ close all;
 clear all; 
 
 %% Creating the geometry
-file = '/geometry/planarCapacitor3D';
+file = './geometry/planarCapacitor3D';
 
 mesh= ofem_v2.Geometry(); 
 mesh.load_from_msh(file);
 
+mesh.create_edges();
+mesh.create_faces();
+mesh.connectFa2Ed();
+
 %% Choosing function space (Element type and order)
-element = P1Element(mesh); 
+%element = ofem_v2.P1Element(mesh); 
+fe = ofem_v2.elements.loadFE('H1_3D_Order_1');
+
+dofs = ofem_v2.DOFHandler(mesh);
+dofs.attach(fe);
 
 %% Creating Material Classes
-paper = Material(); 
+paper = ofem_v2.materials.Material(); 
 paper.epsilon = 0.0005;
 
-glas = Material();
+glas = ofem_v2.materials.Material(); 
 glas.epsilon = 0.0001; 
 
 %% Modeling the Physical Problem
@@ -28,25 +36,26 @@ glas.epsilon = 0.0001;
 % Dirichlet Boundary Conditions
 
 %objName = Constructor(Element, Geometry, has_Stiffness, has_Mass, has_Damping)
-capacitor = Physical_Problem(element, mesh, 1,0,0);
+capacitor = ofem_v2.Physical_Problem(fe, mesh, 1,0,0);
+capacitor.attachDOFHandler(dofs);
 
 % assign material to the parts of the geometry
 paper.setMaterial(capacitor, 'LeftCap');
 glas.setMaterial(capacitor, 'RightCap');
 
 % specify which parameter is neccesarry for which Matrix
-capacitor.chooseParameter('LeftCap',paper.epsilon, 'stiffness');
-capacitor.chooseParameter('RightCap', glas.epsilon, 'stiffness');
+capacitor.setParaS('epsilon');
 
 % create Boundary conditions
-leftPlate = DirichletBC(0, 'LeftDirichlet', mesh); % 0V Potential on the left plate
-rightPlate = DirichletBC(5, 'RightDirichlet', mesh); % 5V Potential on the right plate
+leftPlate = ofem_v2.boundary.Dirichlet(0, 'LeftDirichlet', mesh); % 0V Potential on the left plate
+rightPlate = ofem_v2.boundary.Dirichlet(5, 'RightDirichlet', mesh); % 5V Potential on the right plate
 
 % assign to the Problem
 capacitor.setBoundaryCondition(leftPlate);
 capacitor.setBoundaryCondition(rightPlate);
 
 %% Assembly of the matrices and solving the equation
+dofs.generateDOFs();
 capacitor.assemble(); 
 capacitor.solve(); 
 
