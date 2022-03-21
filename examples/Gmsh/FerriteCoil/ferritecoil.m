@@ -135,9 +135,11 @@ d = R*P*b(dofsNe.freeDOFs);
 
 %%
 A_vec = v_potential.u;
+%gpuB = gpuArray(B);
+%gpud = gpuArray(d);
 %A_vec(dofsNe.freeDOFs) = bicgstab(A(dofsNe.freeDOFs,dofsNe.freeDOFs),b(dofsNe.freeDOFs),1e-6,20000,L,L');
 %y = bicgstabl(B,d,1e-6,20000,L,U);
-[y,~,~,~,resvec] = gmres(B,d,3000,1e-6,3,L,U);
+y = gmres(B,d,300,1e-6,30);
 A_vec(dofsNe.freeDOFs) = C*y;
 t = toc;
 disp("Done in:")
