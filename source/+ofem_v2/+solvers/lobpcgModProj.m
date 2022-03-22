@@ -2,6 +2,8 @@ function [X,l,Wn,lh] = lobpcgModProj(X,S,M,C,n,maxit,tol,Y,YMY,dofs)
 %MYLOBPCG Summary of this function goes here
 %   Detailed explanation goes here
     
+	X = X(dofs,:);
+
     MY = (Y'*M);
     M = M(dofs,dofs);
     S = S(dofs,dofs);
@@ -49,7 +51,7 @@ function [X,l,Wn,lh] = lobpcgModProj(X,S,M,C,n,maxit,tol,Y,YMY,dofs)
     
     NS = svds(S,1,'largest','SubspaceDimension',60,'Tolerance',1e-10);
     NM = svds(M,1,'largest','SubspaceDimension',60,'Tolerance',1e-10);
-    
+
     while norm(full(X'*M*X-speye(size(X,2))))/(norm(full(M*X))*norm(full(X))) > tau
         X = svqb(M,X,10*eps);
     end
@@ -178,13 +180,13 @@ function U = orthoDrop(M,U,V,tau)
     skip = 0;
     
     while norm(full(V'*M*U))/(norm(full(M*V))*norm(full(U))) > tau
-        U = U-V*(V'*M*U);
-%         if norm(full(V'*M*U))/(norm(full(M*V))*norm(full(U))) > tau
-%             disp(norm(full(V'*M*U))/(norm(full(M*V))*norm(full(U))))
-%         end
+		U = U-V*(V'*M*U);
+        if norm(full(V'*M*U))/(norm(full(M*V))*norm(full(U))) > tau
+            disp(norm(full(V'*M*U))/(norm(full(M*V))*norm(full(U))))
+        end
         while norm(full(U'*M*U-speye(size(U,2))))/(norm(full(M*U))*norm(full(U))) > tau
             j = j+1;
-            if j==1
+            if j==1 || j==2
                 [U,skip] = svqb(M,U,tau_r);
             else
                 U = svqbDrop(M,U,tau_drop);

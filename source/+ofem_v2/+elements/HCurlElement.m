@@ -434,7 +434,7 @@ classdef HCurlElement < ofem_v2.elements.Finite_Elements & handle
                 Y_I = kron(speye(Nint),stencil);
             else
                 Y_I = [];
-            end
+			end
             
             Y_g = blkdiag(Y_N0,Y_E,Y_F,Y_I);
             S_g = Y_g'*phys.M*Y_g;
