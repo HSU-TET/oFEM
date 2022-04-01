@@ -2,11 +2,15 @@ function [X,l,Wn,lh] = lobpcgModProj(X,S,M,C,n,maxit,tol,Y,YMY,dofs)
 %MYLOBPCG Summary of this function goes here
 %   Detailed explanation goes here
     
+	X = X(dofs,:);
+
     MY = (Y'*M);
     M = M(dofs,dofs);
     S = S(dofs,dofs);
     Y = Y(dofs,:);
     MY = MY(:,dofs);
+
+    %L = ilu(YMY,struct('udiag',1,'droptol',1e-4));
     
     tau = 1e-14;
     
@@ -20,6 +24,8 @@ function [X,l,Wn,lh] = lobpcgModProj(X,S,M,C,n,maxit,tol,Y,YMY,dofs)
     %[L,U] = ilu(S+sigma*M);
 %     L1 = ichol(S+M);
     %L2 = ichol(YMY);
+    dYMY = decomposition(YMY,'lu','CheckCondition',false);
+    dSM = decomposition(S+M,'lu','CheckCondition',false);
     L2 = [];
     q = 1;
     idx = logical(ones(size(X,2),1));
@@ -40,7 +46,7 @@ function [X,l,Wn,lh] = lobpcgModProj(X,S,M,C,n,maxit,tol,Y,YMY,dofs)
 %             temp = X(:,i);
 %             [SX(:,i),~] = bicgstab(YMY,MY*temp,1e-6,1000,L2,L2');
 %         end
-        SX = YMY\(MY*X);
+        SX = dYMY\(MY*X);
         SX = Y*SX;
 %         SX = SX(dofs,:);
 %         SW = YMY\((MY')*W);
@@ -49,7 +55,7 @@ function [X,l,Wn,lh] = lobpcgModProj(X,S,M,C,n,maxit,tol,Y,YMY,dofs)
     
     NS = svds(S,1,'largest','SubspaceDimension',60,'Tolerance',1e-10);
     NM = svds(M,1,'largest','SubspaceDimension',60,'Tolerance',1e-10);
-    
+
     while norm(full(X'*M*X-speye(size(X,2))))/(norm(full(M*X))*norm(full(X))) > tau
         X = svqb(M,X,10*eps);
     end
@@ -66,7 +72,7 @@ function [X,l,Wn,lh] = lobpcgModProj(X,S,M,C,n,maxit,tol,Y,YMY,dofs)
 %         temp = X(:,i);
 %         [SX(:,i),~] = bicgstab(YMY,MY*temp,1e-6,1000,L2,L2');
 %     end
-    SX = YMY\(MY*X);
+    SX = dYMY\(MY*X);
     SX = Y*SX;
     X = X - SX;
 
@@ -87,12 +93,15 @@ function [X,l,Wn,lh] = lobpcgModProj(X,S,M,C,n,maxit,tol,Y,YMY,dofs)
         
 
         % Soft locking in order
-        if Wn(it,q) < tol
+        while Wn(it,q) < tol
             idx(q) = 0;
             disp(['Eig ',num2str(q),' converged at iteration ',num2str(it)]);
             disp('removing from pool');
             P(:,1) = [];
             q = q+1;
+            if q==n+1
+                break;
+            end
         end
         
         if q >= n+1
@@ -115,18 +124,17 @@ function [X,l,Wn,lh] = lobpcgModProj(X,S,M,C,n,maxit,tol,Y,YMY,dofs)
 %         for i = 1:size(W,2)
 %             [W(:,i),~] = pcg(S+1.8*M,W(:,i),1e-8,1000,L1,L1');
 %         end
-        W = (S+M)\W;
+        W = dSM\W;
+        %W = (S+M)\W;
 %         
         for j =1:1
-%             disp(vecnorm(MY'*W))
             SW = zeros(size(YMY,1),size(W,2));
-            %W = W-X(:,1:q-1)*(X(:,1:q-1)'*M*W);
-%             for i = 1:size(W,2)
+%             parfor i = 1:size(W,2)
 %                 %temp = zeros(totalD,1);
-%                 temp = W(:,i);
-%                 [SW(:,i),~] = bicgstab(YMY,MY*temp,1e-8,1000,L2,L2');
+%                 %[SW(:,i)] = gmres(YMY,MY*W(:,i),10,1e-4,1);
+%                 SW(:,i) = decomp\(MY*W(:,i));
 %             end
-            SW = YMY\(MY*W);
+            SW = dYMY\(MY*W);
             SW = Y*SW;
 %             SW = SW(dofs,:);
     %         SW = YMY\((MY')*W);
@@ -176,15 +184,19 @@ function U = orthoDrop(M,U,V,tau)
     
     j = 0;
     skip = 0;
+
+    n1 = V'*M;
+    n2 = norm(full(M*V));
     
-    while norm(full(V'*M*U))/(norm(full(M*V))*norm(full(U))) > tau
-        U = U-V*(V'*M*U);
+    %while norm(full(V'*M*U))/(norm(full(M*V))*norm(full(U))) > tau
+    while norm(full(n1*U))/(n2*norm(full(U))) > tau
+		U = U-V*(V'*M*U);
 %         if norm(full(V'*M*U))/(norm(full(M*V))*norm(full(U))) > tau
 %             disp(norm(full(V'*M*U))/(norm(full(M*V))*norm(full(U))))
 %         end
         while norm(full(U'*M*U-speye(size(U,2))))/(norm(full(M*U))*norm(full(U))) > tau
             j = j+1;
-            if j==1
+            if j==1 %|| j==2
                 [U,skip] = svqb(M,U,tau_r);
             else
                 U = svqbDrop(M,U,tau_drop);

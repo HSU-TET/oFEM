@@ -8,7 +8,7 @@ close all;
 clear all; 
 
 %% Creating the geometry
-file = './geometry/CapacitorExample2d';
+file = './geometry/CapacitorExample2D';
 
 mesh= ofem_v2.Geometry(); 
 mesh.load_from_msh(file);

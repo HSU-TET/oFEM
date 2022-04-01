@@ -8,18 +8,22 @@ clear all;
 %% Creating the geometry
 file = 'Diffusion2d';
 
-mesh= Geometry(); 
+mesh = ofem_v2.Geometry(); 
 mesh.load_from_msh(file);
 
 %% Choosing function space (Element type and order)
-element = P1Element(mesh); 
+element = ofem_v2.elements.H1Element(2,1);
+element.computeBasis;
+
+dofs = ofem_v2.DOFHandler(mesh);
+dofs.attach(element);
 
 %% Creating Material Classes
-paper = Material(); 
+paper = ofem_v2.materials.Material(); 
 paper.my= 200;
 paper.c = 12;
 
-textile = Material();
+textile = ofem_v2.materials.Material();
 textile.my = 1; 
 textile.c = 1;
 
@@ -28,24 +32,23 @@ textile.c = 1;
 % Dirichlet Boundary Conditions and 2 Neumann Conditions
 
 %objName = Constructor(Element, Geometry, has_Stiffness, has_Mass, has_Damping)
-dif = Physical_Problem(element, mesh, 1, 1,0);
+dif = ofem_v2.Physical_Problem(element, mesh, 1, 1,0);
+dif.attachDOFHandler(dofs);
 
 % assign material to the parts of the geometry
-paper.setMaterial(dif, 'Paper');
-textile.setMaterial(dif, 'Textile');
+mesh.setMaterial('Paper',paper);
+mesh.setMaterial('Textile',textile);
 
 % specify which parameter is neccesarry for which Matrix
-dif.chooseParameter('Paper',paper.my, 'stiffness');
-dif.chooseParameter('Paper', paper.c, 'mass');
-dif.chooseParameter('Textile', textile.my, 'stiffness');
-dif.chooseParameter('Textile', textile.c, 'mass');
+dif.setParaS('my');
+dif.setParaM('c');
 
 % create Boundary conditions
-leftPlate = DirichletBC(0, 'LowCon', mesh); % 0% concentration
-rightPlate = DirichletBC(100, 'HighCon', mesh); % 100% concentration
+leftPlate = ofem_v2.boundary.Dirichlet(0, 'LowCon', mesh); % 0% concentration
+rightPlate = ofem_v2.boundary.Dirichlet(100, 'HighCon', mesh); % 100% concentration
 
-paper2air = NeumannBC(20, 'PaperBoundary', mesh);
-textile2air = NeumannBC(9, 'TextileBoundary', mesh);
+paper2air = ofem_v2.boundary.Neumann(20, 'PaperBoundary', mesh);
+textile2air = ofem_v2.boundary.Neumann(9, 'TextileBoundary', mesh);
 
 % assign to the Problem
 dif.setBoundaryCondition(leftPlate);
@@ -56,11 +59,13 @@ dif.setBoundaryCondition(textile2air);
 % set initial conditions 
 init = Initial_Condition(0);
 
+dofs.generateDOFs;
+
 
 %% Assembly of the matrices and solving the equation
 dif.assemble(); 
 
 
 %% Solving and Exporting the Data
-dif.parabolic_solve(init, 100, 1); 
+dif.parabolic_solve(init, 100, 1,[pwd,'/export'],['time']); 
 

@@ -68,6 +68,8 @@ classdef Dirichlet < handle & ofem_v2.boundary.FixedBoundary
 				dofs = [dofs;physicalProblem.DOFs.f2DOF(obj.faces)];
 			end
 			
+			%obj.u = sparse(dofs,1,obj.value,N,1);
+
 			u = obj.u;
 			physicalProblem.DOFs.reduceDOFs(obj);
 			

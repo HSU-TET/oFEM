@@ -7,19 +7,24 @@
 close all; 
 clear all; 
 
+for i = 1:6
 %% Creating the geometry
 file = './geometry/planarCapacitor3D';
 
 mesh= ofem_v2.Geometry(); 
 mesh.load_from_msh(file);
 
+mesh.reorderAC;
 mesh.create_edges();
 mesh.create_faces();
 mesh.connectFa2Ed();
+mesh.jacobiandata;
 
 %% Choosing function space (Element type and order)
 %element = ofem_v2.P1Element(mesh); 
-fe = ofem_v2.elements.loadFE('H1_3D_Order_1');
+%fe = ofem_v2.elements.loadFE('H1_3D_Order_1');
+fe = ofem_v2.elements.H1Element(3,i);
+fe.computeBasis;
 
 dofs = ofem_v2.DOFHandler(mesh);
 dofs.attach(fe);
@@ -59,8 +64,12 @@ dofs.generateDOFs();
 capacitor.assemble(); 
 capacitor.solve(); 
 
-%% Exporting the Data
-mesh.export_UCD([pwd,'/export'],['3DCapacitor'],{'U',capacitor.u,''});
+E = capacitor.gradCell(full(capacitor.u));
 
+%% Exporting the Data
+mesh.export_UCD([pwd,'/export'],['3DCapacitor',num2str(i)],...
+					{'U',capacitor.u,''},...
+					{'E',squeeze(E)','','Cell'});
+end
 
 
