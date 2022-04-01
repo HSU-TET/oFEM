@@ -512,7 +512,7 @@ classdef Geometry < handle
                 end
                 
             end
-            jacobiandata(obj);
+            obj.prepare_mesh;
         end
         
         function info=load_from_inp(obj,inp_file_name)
@@ -623,10 +623,11 @@ classdef Geometry < handle
             end
 
             % post-processing
-            obj.jacobiandata;
-            obj.create_edges;
-            obj.create_faces;
-            obj.connectFa2Ed;
+%             obj.jacobiandata;
+%             obj.create_edges;
+%             obj.create_faces;
+%             obj.connectFa2Ed;
+			obj.prepare_mesh;
             
             %% nodesets
 %             bd_ns_name=inp{2,3};
@@ -754,7 +755,17 @@ classdef Geometry < handle
             
             
             
-        end
+		end
+
+		function prepare_mesh(obj)
+			obj.reorderAC;
+			obj.create_edges;
+			if obj.dim==3
+				obj.create_faces;
+			end
+			obj.connectFa2Ed;
+			obj.jacobiandata;
+		end
         
         function export_UCD(obj,folder_name,file_name,meta,varargin)
         %EXPORT_UCD exports solution to inp file.
