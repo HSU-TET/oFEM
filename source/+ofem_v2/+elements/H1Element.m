@@ -178,6 +178,13 @@ classdef H1Element < ofem_v2.elements.Finite_Elements & handle
 			Nl = size(phys.geometry.el,2);
 			
 			S = ofem_v2.tools.matrixarray(zeros(Ns,Ns,Ne));
+
+			chver = ver;
+            if str2num(chver(1,1).Version) >= 9.9
+                S = double(S);
+                detD = double(detD);
+                DinvT = double(DinvT);
+            end
 			
 			if isa(mat,'function_handle')
 				elco = reshape(phys.geometry.co(:,:,el(pIdx,1:Nl)'),[],Nl,Ne);
@@ -188,11 +195,16 @@ classdef H1Element < ofem_v2.elements.Finite_Elements & handle
 				end
 			else
 				for q=1:Nq
-					%dphi = DinvT*obj.dPhi(l(1,q),l(2,q),l(3,q));
 					cnt = ones(size(l(:,q),1),1);
 					lTemp = mat2cell(l(:,q),cnt);
-					dphi = DinvT*obj.dPhi(lTemp{:});
-					S = S+w(q)*(dphi'*mat*dphi);
+					dphi = obj.dPhi(lTemp{:});
+					if str2num(chver(1,1).Version) < 9.9
+                        dphi =  DinvT*ofem_v2.tools.matrixarray(dphi);
+                        S = S+w(q)*(dphi'*mat*dphi);
+                    else
+                        dphi = pagemtimes(DinvT,dphi);
+                        S = S+w(q)*pagemtimes(dphi,'transpose',mat*dphi,'none');
+					end
 				end
 			end
 			
@@ -219,6 +231,12 @@ classdef H1Element < ofem_v2.elements.Finite_Elements & handle
 			
 			M=ofem_v2.tools.matrixarray(zeros(Ns,Ns,Ne));
 			
+			chver = ver;
+            if str2num(chver(1,1).Version) >= 9.9
+                M = double(M);
+                detD = double(detD);
+            end
+
 			if isa(mat,'function_handle')
 				elco = reshape(phys.geometry.co(:,:,el(pIdx,1:Nl)'),[],Nl,Ne);
 				for q=1:Nq
@@ -231,11 +249,15 @@ classdef H1Element < ofem_v2.elements.Finite_Elements & handle
 					cnt = ones(size(l(:,q),1),1);
 					lTemp = mat2cell(l(:,q),cnt);
 					phi = obj.phi(lTemp{:});
-					M = M+w(q)*(phi'*mat*phi);
+					if str2num(chver(1,1).Version) < 9.9
+                        M = M+w(q)*(phi'*mat*phi);
+                    else
+                        M = M+w(q)*pagemtimes(phi,'transpose',mat*phi,'none');
+					end
 				end
 			end
 			
-			M=M*abs(detD);
+			M = M*ofem_v2.tools.matrixarray(abs(detD));
 			
 			I = repmat(dofs,1,size(M,1))';
 			%I = I(:);

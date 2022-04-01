@@ -171,7 +171,7 @@ classdef HCurlElement < ofem_v2.elements.Finite_Elements & handle
             S = ofem_v2.tools.matrixarray(zeros(Ns,Ns,Ne));
 
             chver = ver;
-            if num2str(chver(1,1).Version) >= 9.9
+            if str2num(chver(1,1).Version) >= 9.9
                 S = double(S);
                 detD = double(detD);
                 Dk = double(Dk);
@@ -186,9 +186,11 @@ classdef HCurlElement < ofem_v2.elements.Finite_Elements & handle
                 end
             else
                 for q=1:Nq
-                    dphi(:,:,1) = obj.curlN{1}(l(1,q),l(2,q),l(3,q));
-                    dphi(:,:,2) = obj.curlN{2}(l(1,q),l(2,q),l(3,q));
-                    if num2str(chver(1,1).Version) < 9.9
+					cnt = ones(size(l(:,q),1),1);
+					lTemp = mat2cell(l(:,q),cnt);
+                    dphi(:,:,1) = obj.curlN{1}(lTemp{:});
+                    dphi(:,:,2) = obj.curlN{2}(lTemp{:});
+                    if str2num(chver(1,1).Version) < 9.9
                         dphi =  Dk*ofem_v2.tools.matrixarray(dphi(:,:,refTet));
                         S = S+w(q)*(dphi'*mat*dphi);
                     else
@@ -224,7 +226,7 @@ classdef HCurlElement < ofem_v2.elements.Finite_Elements & handle
             M=ofem_v2.tools.matrixarray(zeros(Ns,Ns,Ne));
 
             chver = ver;
-            if num2str(chver(1,1).Version) >= 9.9
+            if str2num(chver(1,1).Version) >= 9.9
                 DinvT = double(DinvT);
                 detD = double(detD);
                 M = double(M);
@@ -242,7 +244,7 @@ classdef HCurlElement < ofem_v2.elements.Finite_Elements & handle
                     phi(:,:,1) = obj.N{1}(l(1,q),l(2,q),l(3,q));
                     phi(:,:,2) = obj.N{2}(l(1,q),l(2,q),l(3,q));
 
-                    if num2str(chver(1,1).Version) < 9.9
+                    if str2num(chver(1,1).Version) < 9.9
                         phi =  DinvT*ofem_v2.tools.matrixarray(phi(:,:,refTet));
                         M = M+w(q)*(phi'*mat*phi);
                     else
