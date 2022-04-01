@@ -128,34 +128,73 @@ classdef H1Element < ofem_v2.elements.Finite_Elements & handle
 					leg = ofem_v2.tools.LegPoly;
 					leg.computePolynomials(obj.degree+2);
 					
-					ke = [1,2;1,3;1,4;2,3;2,4;3,4];
+					ke1 = [1,2;1,3;1,4;2,3;2,4;3,4];
+					ke2 = [1,2;1,3;1,4;3,2;2,4;3,4];
 					
-					E = [];
-					F = [];
+					E1 = [];
+					E2 = [];
+					F1 = [];
+					F2 = [];
 					I = [];
 					
 					for i = 0:obj.degree-2
 						for k = 1:6
-							E = [E,subs(leg.legIntS(i+2),[x,t],[N(ke(k,1))-N(ke(k,2)),N(ke(k,1))+N(ke(k,2))])];
+							E1 = [E1,subs(leg.legIntS(i+2),[x,t],[N(ke1(k,1))-N(ke1(k,2)),N(ke1(k,1))+N(ke1(k,2))])];
+							E2 = [E2,subs(leg.legIntS(i+2),[x,t],[N(ke2(k,1))-N(ke2(k,2)),N(ke2(k,1))+N(ke2(k,2))])];
+						end
+					end
+
+					kf1 = [1,2,3;1,2,4;1,3,4;2,3,4];
+					kf2 = [1,3,2;1,2,4;1,3,4;3,2,4];
+
+					for k = 1:4
+						for i = 0:obj.degree-3
+							for j = 0:obj.degree-i-3
+								m = subs(leg.legIntS(i+2),[x,t],[N(kf1(k,1))-N(kf1(k,2)),N(kf1(k,1))+N(kf1(k,2))])*N(kf1(k,3));
+								n = subs(leg.legS(j+1),[x,t],[2*N(kf1(k,3))-(N(kf1(k,1))+N(kf1(k,2))+N(kf1(k,3))),N(kf1(k,1))+N(kf1(k,2))+N(kf1(k,3))]);
+								F1 = [F1,m*n];
+								m = subs(leg.legIntS(i+2),[x,t],[N(kf2(k,1))-N(kf2(k,2)),N(kf2(k,1))+N(kf2(k,2))])*N(kf2(k,3));
+								n = subs(leg.legS(j+1),[x,t],[2*N(kf2(k,3))-(N(kf2(k,1))+N(kf2(k,2))+N(kf2(k,3))),N(kf2(k,1))+N(kf2(k,2))+N(kf2(k,3))]);
+								F2 = [F2,m*n];
+							end
+						end
+					end
+
+					for i = 0:obj.degree-4
+						for j = 0:obj.degree-i-4
+							for k = 0:obj.degree-i-j-4
+								m = subs(leg.legIntS(i+2),[x,t],[N(1)-N(2),N(1)+N(2)])*N(3);
+								n = subs(leg.legS(j+1),[x,t],[2*N(3)-(1-N(4)),1-N(4)])*N(4);
+								p = subs(leg.leg(k+1),[x],[2*N(4)-1]);
+								I = [I,m*n*p];
+							end
 						end
 					end
 					
-					phi = [N,E];
+					N = reshape([N,N],1,size(N,2),2);
+                    E = reshape([E1,E2],1,size(E1,2),2);
+                    F = reshape([F1,F2],1,size(F1,2),2);
+                    I = reshape([I,I],1,size(I,2),2);
+					
+					phi = [N,E,F,I];
 					phi = simplify(phi);
 					obj.DOFsPerElement = size(phi,2);
 					
 					dPhi = sym(zeros(3,size(phi,2)));
 					for i = 1:size(phi,2)
-						dPhi(:,i) = gradient(phi(i),dr);
+						dPhi(:,i,1) = gradient(phi(:,i,1),dr);
+						dPhi(:,i,2) = gradient(phi(:,i,2),dr);
 					end
 					
-					phiFunc = matlabFunction(phi,'vars',[u,v,w]);
-					dPhiFunc = matlabFunction(dPhi,'vars',[u,v,w]);
+					phiFunc{1} = matlabFunction(phi(:,:,1),'vars',[u,v,w]);
+					phiFunc{2} = matlabFunction(phi(:,:,2),'vars',[u,v,w]);
+					dPhiFunc{1} = matlabFunction(dPhi(:,:,1),'vars',[u,v,w]);
+					dPhiFunc{2} = matlabFunction(dPhi(:,:,2),'vars',[u,v,w]);
 					
 					obj.nodeDOFs = 1;
-					obj.edgeDOFs = obj.degree-1;
-					obj.faceDOFs = 1/2*(obj.degree-2)*(obj.degree-1);
-					obj.interiorDOFs = 1/6*(obj.degree-3)*(obj.degree-2)*(obj.degree-1);
+					obj.edgeDOFs = size(E,2)/6;
+					obj.faceDOFs = size(F,2)/4;
+					obj.interiorDOFs = size(I,2);
 					
 			end
 			
@@ -167,6 +206,7 @@ classdef H1Element < ofem_v2.elements.Finite_Elements & handle
 		end
 		
 		function S = assembleStiffness(obj, phys, pIdx, mat)
+			refTet = phys.geometry.refTet(pIdx);
 			[w,l] = ofem_v2.tools.gaussSimplex(obj.dim,obj.degreeStiff);
 			dofs = phys.DOFs.el2DOF(pIdx,:);
 			detD = phys.geometry.detD(:,:,pIdx);
@@ -197,12 +237,13 @@ classdef H1Element < ofem_v2.elements.Finite_Elements & handle
 				for q=1:Nq
 					cnt = ones(size(l(:,q),1),1);
 					lTemp = mat2cell(l(:,q),cnt);
-					dphi = obj.dPhi(lTemp{:});
+					dphi(:,:,1) = obj.dPhi{1}(lTemp{:});
+					dphi(:,:,2) = obj.dPhi{2}(lTemp{:});
 					if str2num(chver(1,1).Version) < 9.9
-                        dphi =  DinvT*ofem_v2.tools.matrixarray(dphi);
+                        dphi =  DinvT*ofem_v2.tools.matrixarray(dphi(:,:,refTet));
                         S = S+w(q)*(dphi'*mat*dphi);
                     else
-                        dphi = pagemtimes(DinvT,dphi);
+                        dphi = pagemtimes(DinvT,dphi(:,:,refTet));
                         S = S+w(q)*pagemtimes(dphi,'transpose',mat*dphi,'none');
 					end
 				end
