@@ -155,14 +155,20 @@ classdef Physical_Problem < handle
         
         function du = gradCell(obj,u)
             % Computes the gradient inside each cell. No patch recovery
+			refTet = obj.geometry.refTet;
             DinvT = obj.geometry.DinvT;
             uElem = u(obj.DOFs.el2DOF(:,:));
             uElem = ofem_v2.tools.matrixarray(reshape(uElem',size(uElem,2),1,[]));
-            phi = obj.element.dPhi;
 			if obj.element.dim == 2
-				du = (DinvT*phi(1/3,1/3))*uElem;
+				dphi(:,:,1) = obj.element.dPhi{1}(1/3,1/3);
+				dphi(:,:,2) = obj.element.dPhi{2}(1/3,1/3);
+				dphi = ofem_v2.tools.matrixarray(dphi);
+				du = (DinvT*dphi(:,:,refTet))*uElem;
 			elseif obj.element.dim == 3
-				du = (DinvT*phi(1/4,1/4,1/4))*uElem;
+				dphi(:,:,1) = obj.element.dPhi{1}(1/4,1/4,1/4);
+				dphi(:,:,2) = obj.element.dPhi{2}(1/4,1/4,1/4);
+				dphi = ofem_v2.tools.matrixarray(dphi);
+				du = (DinvT*dphi(:,:,refTet))*uElem;
 			end
         end
         

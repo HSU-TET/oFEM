@@ -169,6 +169,13 @@ classdef HCurlElement < ofem_v2.elements.Finite_Elements & handle
             Nl = size(phys.geometry.el,2);
             
             S = ofem_v2.tools.matrixarray(zeros(Ns,Ns,Ne));
+
+            chver = ver;
+            if str2num(chver(1,1).Version) >= 9.9
+                S = double(S);
+                detD = double(detD);
+                Dk = double(Dk);
+            end
             
             if isa(mat,'function_handle')
                 elco = reshape(phys.geometry.co(:,:,el(pIdx,1:Nl)'),[],Nl,Ne);
@@ -179,11 +186,17 @@ classdef HCurlElement < ofem_v2.elements.Finite_Elements & handle
                 end
             else
                 for q=1:Nq
-                    dphi(:,:,1) = obj.curlN{1}(l(1,q),l(2,q),l(3,q));
-                    dphi(:,:,2) = obj.curlN{2}(l(1,q),l(2,q),l(3,q));
-                    dphi =  Dk*ofem_v2.tools.matrixarray(dphi(:,:,refTet));
-%                     dphii = (Dk*obj.curlN(:,:,q));
-                    S = S+w(q)*(dphi'*mat*dphi);
+					cnt = ones(size(l(:,q),1),1);
+					lTemp = mat2cell(l(:,q),cnt);
+                    dphi(:,:,1) = obj.curlN{1}(lTemp{:});
+                    dphi(:,:,2) = obj.curlN{2}(lTemp{:});
+                    if str2num(chver(1,1).Version) < 9.9
+                        dphi =  Dk*ofem_v2.tools.matrixarray(dphi(:,:,refTet));
+                        S = S+w(q)*(dphi'*mat*dphi);
+                    else
+                        dphi = pagemtimes(Dk,dphi(:,:,refTet));
+                        S = S+w(q)*pagemtimes(dphi,'transpose',mat*dphi,'none');
+                    end
                 end
             end
             
@@ -211,6 +224,13 @@ classdef HCurlElement < ofem_v2.elements.Finite_Elements & handle
             Nl = size(phys.geometry.el,2);
             
             M=ofem_v2.tools.matrixarray(zeros(Ns,Ns,Ne));
+
+            chver = ver;
+            if str2num(chver(1,1).Version) >= 9.9
+                DinvT = double(DinvT);
+                detD = double(detD);
+                M = double(M);
+            end
             
             if isa(mat,'function_handle')
                 elco = reshape(phys.geometry.co(:,:,el(pIdx,1:Nl)'),[],Nl,Ne);
@@ -223,12 +243,18 @@ classdef HCurlElement < ofem_v2.elements.Finite_Elements & handle
                 for q=1:Nq
                     phi(:,:,1) = obj.N{1}(l(1,q),l(2,q),l(3,q));
                     phi(:,:,2) = obj.N{2}(l(1,q),l(2,q),l(3,q));
-                    phi =  DinvT*ofem_v2.tools.matrixarray(phi(:,:,refTet));
-                    M = M+w(q)*(phi'*mat*phi);
+
+                    if str2num(chver(1,1).Version) < 9.9
+                        phi =  DinvT*ofem_v2.tools.matrixarray(phi(:,:,refTet));
+                        M = M+w(q)*(phi'*mat*phi);
+                    else
+                        phi = pagemtimes(DinvT,phi(:,:,refTet));
+                        M = M+w(q)*pagemtimes(phi,'transpose',mat*phi,'none');
+                    end
                 end
             end
             
-            M=M*abs(detD);
+            M=M*ofem_v2.tools.matrixarray(abs(detD));
             
             I = repmat(dofs,1,size(M,1))';
             %I = I(:);
@@ -434,7 +460,7 @@ classdef HCurlElement < ofem_v2.elements.Finite_Elements & handle
                 Y_I = kron(speye(Nint),stencil);
             else
                 Y_I = [];
-            end
+			end
             
             Y_g = blkdiag(Y_N0,Y_E,Y_F,Y_I);
             S_g = Y_g'*phys.M*Y_g;

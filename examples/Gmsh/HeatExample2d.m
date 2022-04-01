@@ -12,12 +12,15 @@ file = '.\geometry\HeatExample2d';
 
 mesh= ofem_v2.Geometry(); 
 mesh.load_from_msh(file);
+mesh.reorderAC;
 mesh.create_edges;
 mesh.create_faces;
 mesh.connectFa2Ed;
 
 %% Choosing function space (Element type and order)
-element = ofem_v2.elements.loadFE('H1_2D_Order_1');
+%element = ofem_v2.elements.loadFE('H1_2D_Order_3');
+element = ofem_v2.elements.H1Element(2,3);
+element.computeBasis;
 dofs = ofem_v2.DOFHandler(mesh);
 dofs.attach(element);
 
