@@ -100,13 +100,13 @@ classdef DOFHandler < handle
                     eDofs = eDofs'+((0:deg-1)*Ned);
                     eDofs = sort(eDofs(:))+Nco;
                 end
-                if deg > 1 && phys.element.faceDOFs > 0
+                if phys.element.faceDOFs > 0
                     fDofs = 1:Nfa;
                     fDofs = setdiff(fDofs,phys.geometry.bd{3,i}.faces);
                     fDofs = obj.f2DOF(fDofs,:);
                     fDofs = sort(fDofs(:))-Ned+Nco;
                 end
-                if deg > 2 && phys.element.interiorDOFs > 0
+                if phys.element.interiorDOFs > 0
                     iDofs = unique(obj.iDOFs(:));
                     iDofs = iDofs + Nco-Ned;
                 end

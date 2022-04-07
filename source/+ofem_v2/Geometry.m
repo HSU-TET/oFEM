@@ -762,8 +762,8 @@ classdef Geometry < handle
 			obj.create_edges;
 			if obj.dim==3
 				obj.create_faces;
+				obj.connectFa2Ed;
 			end
-			obj.connectFa2Ed;
 			obj.jacobiandata;
 		end
         
@@ -1283,12 +1283,20 @@ classdef Geometry < handle
                 end
             end
             
-            idx = logical(ones(size(obj.el,1),4));
+			if obj.dim == 3
+				idx = logical(ones(size(obj.el,1),4));
+			else
+				idx = logical(ones(size(obj.el,1),3));
+			end
             idx(:,1) = false;
             
-            while true
+			while true
                 [~,b] = max(obj.el,[],2);
-                sUpper = b==4;
+				if obj.dim == 3
+					sUpper = b==4;
+				else
+					sUpper = b==3;
+				end
                 if sum(~sUpper) == 0
                     break
                 end
@@ -1297,7 +1305,7 @@ classdef Geometry < handle
                 for i = 1:size(obj.el,1)
                     obj.el(i,idx(i,:)) = circshift(obj.el(i,idx(i,:)),1,2);
                 end
-            end
+			end
             
             obj.refTet = double(obj.el(:,2)>obj.el(:,3))+1;
             
