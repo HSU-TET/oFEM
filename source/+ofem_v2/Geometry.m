@@ -624,9 +624,10 @@ classdef Geometry < handle
 
             % post-processing
 %             obj.jacobiandata;
-%             obj.create_edges;
-%             obj.create_faces;
-%             obj.connectFa2Ed;
+            obj.create_edges;
+            obj.create_faces;
+            obj.connectFa2Ed;
+% 			obj.prepare_mesh;
             
             %% nodesets
 %             bd_ns_name=inp{2,3};
@@ -744,14 +745,14 @@ classdef Geometry < handle
                 
                 obj.parts{2,elidx}=matidx;
               end
-			end
-
-			obj.prepare_mesh;
+            end
             
             info.time.post_proccess=toc;
 
             obj.Nint = size(obj.el,1);
             
+			obj.prepare_mesh;
+
             clear inp;
             
             
@@ -1260,14 +1261,18 @@ classdef Geometry < handle
         end
         
         function reorderAC(obj)
-            [~,a] = min(obj.el,[],2);
-            a1 = a==1;
-            a2 = a==2;
-            a3 = a==3;
-            a4 = a==4;
-            
-            idx = [~a1,a2,a3,a4];
-            idx(:,1:3) = idx(:,1:3)|circshift(idx(:,1:3),1,2);
+			if obj.dim == 3
+            	[~,a] = min(obj.el,[],2);
+            	a1 = a==1;
+            	a2 = a==2;
+            	a3 = a==3;
+            	a4 = a==4;
+            	
+            	idx = [~a1,a2,a3,a4];
+            	idx(:,1:3) = idx(:,1:3)|circshift(idx(:,1:3),1,2);
+			else
+				idx = logical(ones(size(obj.el,1),obj.dim+1));
+			end
             
             while true
                 [~,a] = min(obj.el,[],2);
@@ -1278,10 +1283,12 @@ classdef Geometry < handle
                 end
                 
                 idx(sLower,:) = false;
+				obj.el = obj.el';
+
+				tmp = reshape(obj.el(idx'),3,[]);
                 
-                for i=1:size(obj.el,1)
-                    obj.el(i,idx(i,:)) = circshift(obj.el(i,idx(i,:)),1,2);
-                end
+				obj.el(idx') = circshift(tmp,1);
+				obj.el = obj.el';
             end
             
 			if obj.dim == 3
@@ -1302,10 +1309,12 @@ classdef Geometry < handle
                     break
                 end
                 idx(sUpper,:) = false;
+
+				obj.el(idx) = circshift(reshape(obj.el(idx),[],obj.dim),1,2);
                 
-                for i = 1:size(obj.el,1)
-                    obj.el(i,idx(i,:)) = circshift(obj.el(i,idx(i,:)),1,2);
-                end
+%                 for i = 1:size(obj.el,1)
+%                     obj.el(i,idx(i,:)) = circshift(obj.el(i,idx(i,:)),1,2);
+%                 end
 			end
             
             obj.refTet = double(obj.el(:,2)>obj.el(:,3))+1;
