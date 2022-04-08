@@ -222,8 +222,9 @@ classdef H1Element < ofem_v2.elements.Finite_Elements & handle
 			
 			S = ofem_v2.tools.matrixarray(zeros(Ns,Ns,Ne));
 
-			chver = ver;
-            if str2num(chver(1,1).Version) >= 9.9
+			chver = split(version,'.');
+			chver = str2double([chver{1},'.',chver{2}]);
+            if chver >= 9.9
                 S = double(S);
                 detD = double(detD);
                 DinvT = double(DinvT);
@@ -242,7 +243,7 @@ classdef H1Element < ofem_v2.elements.Finite_Elements & handle
 					lTemp = mat2cell(l(:,q),cnt);
 					dphi(:,:,1) = obj.dPhi{1}(lTemp{:});
 					dphi(:,:,2) = obj.dPhi{2}(lTemp{:});
-					if str2num(chver(1,1).Version) < 9.9
+					if chver < 9.9
                         dphi =  DinvT*ofem_v2.tools.matrixarray(dphi(:,:,refTet));
                         S = S+w(q)*(dphi'*mat*dphi);
                     else
@@ -276,8 +277,9 @@ classdef H1Element < ofem_v2.elements.Finite_Elements & handle
 			
 			M=ofem_v2.tools.matrixarray(zeros(Ns,Ns,Ne));
 			
-			chver = ver;
-            if str2num(chver(1,1).Version) >= 9.9
+			chver = split(version,'.');
+			chver = str2double([chver{1},'.',chver{2}]);
+            if chver >= 9.9
                 M = double(M);
                 detD = double(detD);
             end
@@ -295,7 +297,7 @@ classdef H1Element < ofem_v2.elements.Finite_Elements & handle
 					lTemp = mat2cell(l(:,q),cnt);
 					phi(:,:,1) = obj.phi{1}(lTemp{:});
 					phi(:,:,2) = obj.phi{2}(lTemp{:});
-					if str2num(chver(1,1).Version) < 9.9
+					if chver < 9.9
 						phi = ofem_v2.tools.matrixarray(phi);
                         M = M+w(q)*(phi(:,:,refTet)'*mat*phi(:,:,refTet));
                     else
