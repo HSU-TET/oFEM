@@ -744,15 +744,15 @@ classdef Geometry < handle
                 
                 obj.parts{2,elidx}=matidx;
               end
-            end
+			end
+
+			obj.prepare_mesh;
             
             info.time.post_proccess=toc;
 
             obj.Nint = size(obj.el,1);
             
             clear inp;
-
-			obj.prepare_mesh;
             
             
             
