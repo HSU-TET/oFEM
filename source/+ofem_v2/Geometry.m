@@ -627,7 +627,6 @@ classdef Geometry < handle
 %             obj.create_edges;
 %             obj.create_faces;
 %             obj.connectFa2Ed;
-			obj.prepare_mesh;
             
             %% nodesets
 %             bd_ns_name=inp{2,3};
@@ -752,6 +751,8 @@ classdef Geometry < handle
             obj.Nint = size(obj.el,1);
             
             clear inp;
+
+			obj.prepare_mesh;
             
             
             
