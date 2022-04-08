@@ -13,7 +13,7 @@ for dim = 1:3
 end
 
 % H Curl
-for dim = 3:3
+for dim = 2:3
 	for deg = 0:3
 		fe = ofem_v2.elements.HCurlElement(dim,deg);
 		fe.computeBasis;
