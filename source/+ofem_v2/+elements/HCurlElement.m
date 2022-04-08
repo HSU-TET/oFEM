@@ -33,8 +33,8 @@ classdef HCurlElement < ofem_v2.elements.Finite_Elements & handle
             obj.dim = dim;
             obj.degree = deg;
             if deg == 0; deg = 1; end
-            obj.degreeMass = 2*(deg);
-            obj.degreeStiff = 2*(deg);
+            obj.degreeMass = deg*2;
+            obj.degreeStiff = deg*2;
         end
         
         function [N,curlN] = computeBasis(obj)

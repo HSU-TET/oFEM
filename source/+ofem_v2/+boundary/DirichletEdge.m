@@ -53,7 +53,7 @@ classdef DirichletEdge < handle & ofem_v2.boundary.FixedBoundary
 		function u = loadVector(obj, phys)
             % handle edges
             % TODO: 1 dim quadrature
-            [w,l] = ofem_v2.tools.gaussSimplex(1,phys.element.degreeStiff/2);
+            [w,l] = ofem_v2.tools.gaussSimplex(1,ceil(phys.element.degreeStiff/2));
             eDofs = phys.DOFs.e2DOF(obj.edges,:);
             eDofs = reshape(eDofs',1,phys.element.degree+1,[]);
             v1 = phys.geometry.co(:,:,phys.geometry.ed(obj.edges,1));
@@ -79,7 +79,7 @@ classdef DirichletEdge < handle & ofem_v2.boundary.FixedBoundary
             % handle faces
             % TODO: 2 dim quadrature
             if phys.element.degree > 1 && phys.element.dim == 3
-                [w,l] = ofem_v2.tools.gaussSimplex(2,phys.element.degreeStiff/2);
+                [w,l] = ofem_v2.tools.gaussSimplex(2,ceil(phys.element.degreeStiff/2));
 
                 fDofs = phys.DOFs.f2DOF(obj.faces,:);
                 fDofs = reshape(fDofs',1,size(fDofs,2),[]);

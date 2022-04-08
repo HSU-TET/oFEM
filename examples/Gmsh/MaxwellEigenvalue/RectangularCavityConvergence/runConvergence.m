@@ -21,21 +21,26 @@ for i = 1:nh
 	air = ofem_v2.materials.Material;
 	air.stiff = 1;
 	air.mass = 1;
+	if i == 4
+		no = no-1;
+	end
+	if i == 5
+		no = no-1;
+	end
 
-	n(i) = mesh.Nint;
 	
 	mesh.setMaterial('Domain',air);
 	for j = 0:no
-		err(:,i,j+1) = rect(mesh,j);
+		[err(:,i,j+1),n(i,j+1)] = rect(mesh,j);
 	end
 end
 
 %%
 figure;
 err = abs(err);
-loglog(n(1:8),err(2,1:8,1))
+loglog(n(:,1),err(2,:,1))
 hold on
-loglog(n(1:8),err(2,1:8,2))
-loglog(n(1:8),err(2,1:8,3))
-loglog(n(1:8),err(2,1:8,4))
+loglog(n(:,2),err(2,:,2))
+loglog(n(1:4,3),err(2,1:4,3))
+loglog(n(1:3,4),err(2,1:3,4))
 legend('0','1','2','3')
