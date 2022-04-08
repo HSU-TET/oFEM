@@ -231,8 +231,8 @@ classdef HCurlElement < ofem_v2.elements.Finite_Elements & handle
             
             S = ofem_v2.tools.matrixarray(zeros(Ns,Ns,Ne));
 
-            chver = ver;
-            if str2num(chver(1,1).Version) >= 9.9
+            chver = exist('pagemtimes','builtin');
+            if chver
                 S = double(S);
                 detD = double(detD);
                 Dk = double(Dk);
@@ -251,7 +251,7 @@ classdef HCurlElement < ofem_v2.elements.Finite_Elements & handle
 					lTemp = mat2cell(l(:,q),cnt);
                     dphi(:,:,1) = obj.curlN{1}(lTemp{:});
                     dphi(:,:,2) = obj.curlN{2}(lTemp{:});
-                    if str2num(chver(1,1).Version) < 9.9
+                    if ~chver
                         dphi =  ofem_v2.tools.matrixarray(dphi(:,:,refTet));
 						if obj.dim == 3
 							dphi = Dk*dphi;
@@ -267,7 +267,11 @@ classdef HCurlElement < ofem_v2.elements.Finite_Elements & handle
                 end
             end
             
-            S=S*ofem_v2.tools.matrixarray(1./abs(detD));
+			if ~chver
+				S=S*ofem_v2.tools.matrixarray(1./abs(detD));
+			else
+				S = pagemtimes(S,1/abs(detD));
+			end
             
             I = repmat(dofs,1,size(S,1))';
             I = I(:);
@@ -292,8 +296,8 @@ classdef HCurlElement < ofem_v2.elements.Finite_Elements & handle
             
             M=ofem_v2.tools.matrixarray(zeros(Ns,Ns,Ne));
 
-            chver = ver;
-            if str2num(chver(1,1).Version) >= 9.9
+            chver = exist('pagemtimes','builtin');
+            if chver
                 DinvT = double(DinvT);
                 detD = double(detD);
                 M = double(M);
@@ -313,7 +317,7 @@ classdef HCurlElement < ofem_v2.elements.Finite_Elements & handle
                     phi(:,:,1) = obj.N{1}(lTemp{:});
                     phi(:,:,2) = obj.N{2}(lTemp{:});
 
-                    if str2num(chver(1,1).Version) < 9.9
+                    if ~chver
                         phi =  DinvT*ofem_v2.tools.matrixarray(phi(:,:,refTet));
                         M = M+w(q)*(phi'*mat*phi);
                     else
@@ -323,7 +327,11 @@ classdef HCurlElement < ofem_v2.elements.Finite_Elements & handle
                 end
             end
             
-            M=M*ofem_v2.tools.matrixarray(abs(detD));
+			if ~chver
+				M=M*ofem_v2.tools.matrixarray(abs(detD));
+			else
+				M = pagemtimes(M,abs(detD));
+			end
             
             I = repmat(dofs,1,size(M,1))';
             %I = I(:);

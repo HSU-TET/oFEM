@@ -253,7 +253,11 @@ classdef H1Element < ofem_v2.elements.Finite_Elements & handle
 				end
 			end
 			
-			S=S*ofem_v2.tools.matrixarray(abs(detD));
+			if chver < 9
+				S=S*ofem_v2.tools.matrixarray(abs(detD));
+			else
+				S = pagemtimes(S,abs(detD));
+			end
 			
 			I = repmat(dofs,1,size(S,1))';
 			I = I(:);
@@ -306,7 +310,11 @@ classdef H1Element < ofem_v2.elements.Finite_Elements & handle
 				end
 			end
 			
-			M = M*ofem_v2.tools.matrixarray(abs(detD));
+			if chver < 9
+				M = M*ofem_v2.tools.matrixarray(abs(detD));
+			else
+				M = pagemtimes(M,abs(detD));
+			end
 			
 			I = repmat(dofs,1,size(M,1))';
 			%I = I(:);
