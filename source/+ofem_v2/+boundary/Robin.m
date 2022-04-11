@@ -92,7 +92,7 @@ classdef Robin < handle & ofem_v2.boundary.MixedBoundary
 				for q  = 1:Nq
 					cnt = ones(size(l(:,q),1),1);
 					lTemp = mat2cell(l(:,q),cnt);
-					phi = obj.feBd.phi(lTemp{:});
+					phi = obj.feBd.phi{1}(lTemp{:});
 					val = obj.value(obj.normalVector);
 					F = F + val'*(w(q)*phi);
 				end
@@ -100,7 +100,7 @@ classdef Robin < handle & ofem_v2.boundary.MixedBoundary
 				for q=1:Nq
 					cnt = ones(size(l(:,q),1),1);
 					lTemp = mat2cell(l(:,q),cnt);
-					phi = obj.feBd.phi(lTemp{:});
+					phi = obj.feBd.phi{1}(lTemp{:});
 					F = F + obj.value*(w(q)*phi);
 				end
 			end
@@ -140,7 +140,7 @@ classdef Robin < handle & ofem_v2.boundary.MixedBoundary
 				for q  = 1:Nq
 					cnt = ones(size(l(:,q),1),1);
 					lTemp = mat2cell(l(:,q),cnt);
-					phi = obj.feBd.phi(lTemp{:});
+					phi = obj.feBd.phi{1}(lTemp{:});
 					val = obj.value(obj.normalVector);
 					F = F + val'*(w(q)*phi);
 				end
@@ -148,7 +148,7 @@ classdef Robin < handle & ofem_v2.boundary.MixedBoundary
 				for q=1:Nq
 					cnt = ones(size(l(:,q),1),1);
 					lTemp = mat2cell(l(:,q),cnt);
-					phi = obj.feBd.phi(lTemp{:});
+					phi = obj.feBd.phi{1}(lTemp{:});
 					M = M + obj.alpha*w(q)*(phi'*phi);
 				end
 			end
