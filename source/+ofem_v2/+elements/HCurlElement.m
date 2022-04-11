@@ -13,9 +13,9 @@ classdef HCurlElement < ofem_v2.elements.Finite_Elements & handle
         degreeMass;
         degreeStiff;
         nodeDOFs = 0;
-        edgeDOFs;
-        faceDOFs;
-        interiorDOFs;
+        edgeDOFs = 0;
+        faceDOFs = 0;
+        interiorDOFs = 0;
         DOFsPerElement;
         Stiffness_matrix;
         Damping_matrix;
@@ -33,15 +33,77 @@ classdef HCurlElement < ofem_v2.elements.Finite_Elements & handle
             obj.dim = dim;
             obj.degree = deg;
             if deg == 0; deg = 1; end
-            obj.degreeMass = 2*(deg);
-            obj.degreeStiff = 2*(deg);
+            obj.degreeMass = deg*2;
+            obj.degreeStiff = deg*2;
         end
         
         function [N,curlN] = computeBasis(obj)
             switch obj.dim
                 case 2
-                    error('ofem:finiteelement:basis:Unsupported',...
-                        '2D elements are not implemented yet!');
+                    syms u v x t c
+					dr = [u,v];
+
+					l1 = 1-u-v;
+					l2 = u;
+					l3 = v;
+
+					l = [l1,l2,l3];
+
+					E{1} = l(2)*gradient(l(1),dr)-l(1)*gradient(l(2),dr);
+                    E{2} = l(3)*gradient(l(1),dr)-l(1)*gradient(l(3),dr);
+                    E{3} = l(3)*gradient(l(2),dr)-l(2)*gradient(l(3),dr);
+
+					E = [E{1},E{2},E{3}];
+
+					leg = ofem_v2.tools.LegPoly;
+					leg.computePolynomials(obj.degree+2);
+
+					I = [];
+
+					ke = [1,2;1,3;2,3];
+
+					for i = 0:obj.degree-1
+						for k = 1:3
+							E = [E,gradient(subs(leg.legIntS(i+2),[x,t],[l(ke(k,1))-l(ke(k,2)),l(ke(k,1))+l(ke(k,2))]),dr)];
+						end
+					end
+
+					for i = 0:obj.degree-2
+						for j = 0:obj.degree-i-2
+							m = subs(leg.legIntS(i+2),[x,t],[l(2)-l(1),l(1)+l(2)]);
+							n = l(3)*subs(leg.leg(j+1),[x],[2*l(3)-1]);
+							I = [I,gradient(m,dr)*n+m*gradient(n,dr)];
+							I = [I,gradient(m,dr)*n-m*gradient(n,dr)];
+							if i==0
+								I = [I,(gradient(l(1),dr)*l(2)-l(1)*gradient(l(2),dr))*n];
+							end
+						end
+					end
+
+                    E = reshape([E,E],obj.dim,size(E,2),2);
+                    I = reshape([I,I],obj.dim,size(I,2),2);
+                    N = [E,I];
+                    N = simplify(N);
+                    obj.DOFsPerElement = size(N,2);
+                    %curlN = N;
+                    for i = 1:size(N,2)
+                        curlN(:,i,1) = curl([N(:,i,1);sym(0)],[dr,c]);
+                        curlN(:,i,2) = curl([N(:,i,2);sym(0)],[dr,c]);
+                    end
+                    
+                    curlFunc{1} = matlabFunction(curlN(3,:,1),'vars',[u,v]);
+                    curlFunc{2} = matlabFunction(curlN(3,:,2),'vars',[u,v]);
+                    NFunc{1} = matlabFunction(N(:,:,1),'vars',[u,v]);
+                    NFunc{2} = matlabFunction(N(:,:,2),'vars',[u,v]);
+
+                    obj.edgeDOFs = obj.degree+1;
+                    obj.interiorDOFs = size(I,2);
+                    N = NFunc;
+                    curlN = curlFunc;
+                    obj.N = NFunc;
+                    obj.curlN = curlFunc;
+
+
                 case 3
                     %% First compute the zeroth order Nedelec elements to construct everything
                     syms u v w x t c;
@@ -55,7 +117,6 @@ classdef HCurlElement < ofem_v2.elements.Finite_Elements & handle
                     
                     l = [l1,l2,l3,l4];
                     
-                    E = {};
                     
                     %% Zeroth order H curl base
                     % edge 1 2
@@ -170,8 +231,8 @@ classdef HCurlElement < ofem_v2.elements.Finite_Elements & handle
             
             S = ofem_v2.tools.matrixarray(zeros(Ns,Ns,Ne));
 
-            chver = ver;
-            if str2num(chver(1,1).Version) >= 9.9
+            chver = exist('pagemtimes','builtin');
+            if chver
                 S = double(S);
                 detD = double(detD);
                 Dk = double(Dk);
@@ -190,17 +251,27 @@ classdef HCurlElement < ofem_v2.elements.Finite_Elements & handle
 					lTemp = mat2cell(l(:,q),cnt);
                     dphi(:,:,1) = obj.curlN{1}(lTemp{:});
                     dphi(:,:,2) = obj.curlN{2}(lTemp{:});
-                    if str2num(chver(1,1).Version) < 9.9
-                        dphi =  Dk*ofem_v2.tools.matrixarray(dphi(:,:,refTet));
+                    if ~chver
+                        dphi =  ofem_v2.tools.matrixarray(dphi(:,:,refTet));
+						if obj.dim == 3
+							dphi = Dk*dphi;
+						end
                         S = S+w(q)*(dphi'*mat*dphi);
                     else
-                        dphi = pagemtimes(Dk,dphi(:,:,refTet));
+                        dphi = dphi(:,:,refTet);
+						if obj.dim == 3
+							dphi = pagemtimes(Dk,dphi);
+						end
                         S = S+w(q)*pagemtimes(dphi,'transpose',mat*dphi,'none');
                     end
                 end
             end
             
-            S=S*ofem_v2.tools.matrixarray(1./abs(detD));
+			if ~chver
+				S=S*ofem_v2.tools.matrixarray(1./abs(detD));
+			else
+				S = pagemtimes(S,1/abs(detD));
+			end
             
             I = repmat(dofs,1,size(S,1))';
             I = I(:);
@@ -225,8 +296,8 @@ classdef HCurlElement < ofem_v2.elements.Finite_Elements & handle
             
             M=ofem_v2.tools.matrixarray(zeros(Ns,Ns,Ne));
 
-            chver = ver;
-            if str2num(chver(1,1).Version) >= 9.9
+            chver = exist('pagemtimes','builtin');
+            if chver
                 DinvT = double(DinvT);
                 detD = double(detD);
                 M = double(M);
@@ -241,10 +312,12 @@ classdef HCurlElement < ofem_v2.elements.Finite_Elements & handle
                 end
             else
                 for q=1:Nq
-                    phi(:,:,1) = obj.N{1}(l(1,q),l(2,q),l(3,q));
-                    phi(:,:,2) = obj.N{2}(l(1,q),l(2,q),l(3,q));
+					cnt = ones(size(l(:,q),1),1);
+					lTemp = mat2cell(l(:,q),cnt);
+                    phi(:,:,1) = obj.N{1}(lTemp{:});
+                    phi(:,:,2) = obj.N{2}(lTemp{:});
 
-                    if str2num(chver(1,1).Version) < 9.9
+                    if ~chver
                         phi =  DinvT*ofem_v2.tools.matrixarray(phi(:,:,refTet));
                         M = M+w(q)*(phi'*mat*phi);
                     else
@@ -254,7 +327,11 @@ classdef HCurlElement < ofem_v2.elements.Finite_Elements & handle
                 end
             end
             
-            M=M*ofem_v2.tools.matrixarray(abs(detD));
+			if ~chver
+				M=M*ofem_v2.tools.matrixarray(abs(detD));
+			else
+				M = pagemtimes(M,abs(detD));
+			end
             
             I = repmat(dofs,1,size(M,1))';
             %I = I(:);
@@ -418,7 +495,7 @@ classdef HCurlElement < ofem_v2.elements.Finite_Elements & handle
             end
         end
 
-        function [S_g,Y_g] = AMS(obj,phys)
+        function Y_g = AMS(obj,phys)
             Ned = phys.geometry.Ned;
             Nco = phys.geometry.Nco;
             Nfa = phys.geometry.Nfa;
@@ -434,7 +511,7 @@ classdef HCurlElement < ofem_v2.elements.Finite_Elements & handle
             
             Y_E = speye(Ned*obj.degree);
             
-            if obj.degree > 1 && obj.faceDOFs>0
+            if obj.dim == 3 && obj.faceDOFs>0
                 sten1 = sparse(diag([1,0,0]));
                 sten2 = sparse(diag([1,0]));
                 
@@ -448,7 +525,7 @@ classdef HCurlElement < ofem_v2.elements.Finite_Elements & handle
                 Y_F = [];
             end
             
-            if obj.degree > 2 && obj.interiorDOFs > 0
+            if obj.dim == 3 && obj.degree > 2 && obj.interiorDOFs > 0
                 sten1 = sparse(diag([1,0,0,0]));
                 sten2 = sparse(diag([1,0,0]));
                 
@@ -458,12 +535,22 @@ classdef HCurlElement < ofem_v2.elements.Finite_Elements & handle
                 stencil = blkdiag(kron(eye1,sten1),kron(eye2,sten2));
                 
                 Y_I = kron(speye(Nint),stencil);
+
+			elseif obj.dim == 2 && obj.interiorDOFs > 0
+				sten1 = sparse(diag([1,0,0]));
+				sten2 = sparse(diag([1,0]));
+
+				eye1 = speye(sum(1:obj.degree-1));
+				eye2 = speye(sum(sum(triu(repelem(1:obj.degree-2,obj.degree-2,1)'))));
+
+				stencil = blkdiag(kron(eye1,sten1),kron(eye2,sten2));
+                
+                Y_I = kron(speye(Nint),stencil);
             else
                 Y_I = [];
 			end
             
             Y_g = blkdiag(Y_N0,Y_E,Y_F,Y_I);
-            S_g = Y_g'*phys.M*Y_g;
 		end
         
     end

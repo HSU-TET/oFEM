@@ -131,15 +131,15 @@ d = R*P*b(dofsNe.freeDOFs);
 %L = ichol(M(dofsNe.freeDOFs,dofsNe.freeDOFs));
 %L = ichol(B);
 %[L,U] = ilu(A(dofsNe.freeDOFs,dofsNe.freeDOFs));
-[L,U] = ilu(B);
+[L,U] = ilu(abs(B));
 
 %%
 A_vec = v_potential.u;
 %gpuB = gpuArray(B);
 %gpud = gpuArray(d);
 %A_vec(dofsNe.freeDOFs) = bicgstab(A(dofsNe.freeDOFs,dofsNe.freeDOFs),b(dofsNe.freeDOFs),1e-6,20000,L,L');
-%y = bicgstabl(B,d,1e-6,20000,L,U);
-y = gmres(B,d,300,1e-6,30);
+y = bicgstabl(B,d,1e-6,2000,L,U);
+%y = gmres(B,d,300,1e-6,30);
 A_vec(dofsNe.freeDOFs) = C*y;
 t = toc;
 disp("Done in:")

@@ -1,4 +1,4 @@
-function err = rect(mesh,order)
+function [err,n] = rect(mesh,order)
 
 	
 	%fe = ofem_v2.elements.loadFE('HCurl_3D_Order_3');
@@ -23,7 +23,7 @@ function err = rect(mesh,order)
 	
 	resonator.assemble;
 	
-	[~,Y_g] = fe.AMS(resonator);
+	Y_g = fe.AMS(resonator);
 	amsDOFS = dofs.AMSDOFs(resonator);
 	
 	S = resonator.S;
@@ -40,5 +40,6 @@ function err = rect(mesh,order)
 	[x(dofs.freeDOFs,:),l,~,~] = ofem_v2.solvers.lobpcgModProj(X,S,M,[],10,50,1e-9,Y_g,S_g,dofs.freeDOFs);
 	exact = [2,2,2,3,3,5,5,5,5,5,5,6,6,6,6,6,6,8,8,8]';
 	err = l-exact;
+	n = dofs.Nd;
 end
 

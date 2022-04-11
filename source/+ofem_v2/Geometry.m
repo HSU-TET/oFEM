@@ -624,10 +624,10 @@ classdef Geometry < handle
 
             % post-processing
 %             obj.jacobiandata;
-%             obj.create_edges;
-%             obj.create_faces;
-%             obj.connectFa2Ed;
-			obj.prepare_mesh;
+            obj.create_edges;
+            obj.create_faces;
+            obj.connectFa2Ed;
+% 			obj.prepare_mesh;
             
             %% nodesets
 %             bd_ns_name=inp{2,3};
@@ -751,6 +751,8 @@ classdef Geometry < handle
 
             obj.Nint = size(obj.el,1);
             
+			obj.prepare_mesh;
+
             clear inp;
             
             
@@ -762,8 +764,8 @@ classdef Geometry < handle
 			obj.create_edges;
 			if obj.dim==3
 				obj.create_faces;
+				obj.connectFa2Ed;
 			end
-			obj.connectFa2Ed;
 			obj.jacobiandata;
 		end
         
@@ -1259,14 +1261,18 @@ classdef Geometry < handle
         end
         
         function reorderAC(obj)
-            [~,a] = min(obj.el,[],2);
-            a1 = a==1;
-            a2 = a==2;
-            a3 = a==3;
-            a4 = a==4;
-            
-            idx = [~a1,a2,a3,a4];
-            idx(:,1:3) = idx(:,1:3)|circshift(idx(:,1:3),1,2);
+			if obj.dim == 3
+            	[~,a] = min(obj.el,[],2);
+            	a1 = a==1;
+            	a2 = a==2;
+            	a3 = a==3;
+            	a4 = a==4;
+            	
+            	idx = [~a1,a2,a3,a4];
+            	idx(:,1:3) = idx(:,1:3)|circshift(idx(:,1:3),1,2);
+			else
+				idx = logical(ones(size(obj.el,1),obj.dim+1));
+			end
             
             while true
                 [~,a] = min(obj.el,[],2);
@@ -1277,27 +1283,39 @@ classdef Geometry < handle
                 end
                 
                 idx(sLower,:) = false;
+				obj.el = obj.el';
+
+				tmp = reshape(obj.el(idx'),3,[]);
                 
-                for i=1:size(obj.el,1)
-                    obj.el(i,idx(i,:)) = circshift(obj.el(i,idx(i,:)),1,2);
-                end
+				obj.el(idx') = circshift(tmp,1);
+				obj.el = obj.el';
             end
             
-            idx = logical(ones(size(obj.el,1),4));
+			if obj.dim == 3
+				idx = logical(ones(size(obj.el,1),4));
+			else
+				idx = logical(ones(size(obj.el,1),3));
+			end
             idx(:,1) = false;
             
-            while true
+			while true
                 [~,b] = max(obj.el,[],2);
-                sUpper = b==4;
+				if obj.dim == 3
+					sUpper = b==4;
+				else
+					sUpper = b==3;
+				end
                 if sum(~sUpper) == 0
                     break
                 end
                 idx(sUpper,:) = false;
+
+				obj.el(idx) = circshift(reshape(obj.el(idx),[],obj.dim),1,2);
                 
-                for i = 1:size(obj.el,1)
-                    obj.el(i,idx(i,:)) = circshift(obj.el(i,idx(i,:)),1,2);
-                end
-            end
+%                 for i = 1:size(obj.el,1)
+%                     obj.el(i,idx(i,:)) = circshift(obj.el(i,idx(i,:)),1,2);
+%                 end
+			end
             
             obj.refTet = double(obj.el(:,2)>obj.el(:,3))+1;
             

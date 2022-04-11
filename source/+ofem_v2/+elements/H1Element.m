@@ -108,8 +108,11 @@ classdef H1Element < ofem_v2.elements.Finite_Elements & handle
 						dPhi(:,i) = gradient(phi(i),dr);
 					end
 					
-					phiFunc = matlabFunction(phi,'vars',[u,v]);
-					dPhiFunc = matlabFunction(dPhi,'vars',[u,v]);
+					% Quickfix
+					phiFunc{1} = matlabFunction(phi,'vars',[u,v]);
+					phiFunc{2} = phiFunc{1};
+					dPhiFunc{1} = matlabFunction(dPhi,'vars',[u,v]);
+					dPhiFunc{2} = dPhiFunc{1};
 					obj.nodeDOFs = 1;
 					obj.edgeDOFs = obj.degree-1;
 					obj.interiorDOFs = 1/2*(obj.degree-2)*(obj.degree-1);
@@ -219,8 +222,9 @@ classdef H1Element < ofem_v2.elements.Finite_Elements & handle
 			
 			S = ofem_v2.tools.matrixarray(zeros(Ns,Ns,Ne));
 
-			chver = ver;
-            if str2num(chver(1,1).Version) >= 9.9
+			chver = split(version,'.');
+			chver = str2double(chver{2});
+            if chver >= 9
                 S = double(S);
                 detD = double(detD);
                 DinvT = double(DinvT);
@@ -239,7 +243,7 @@ classdef H1Element < ofem_v2.elements.Finite_Elements & handle
 					lTemp = mat2cell(l(:,q),cnt);
 					dphi(:,:,1) = obj.dPhi{1}(lTemp{:});
 					dphi(:,:,2) = obj.dPhi{2}(lTemp{:});
-					if str2num(chver(1,1).Version) < 9.9
+					if chver < 9
                         dphi =  DinvT*ofem_v2.tools.matrixarray(dphi(:,:,refTet));
                         S = S+w(q)*(dphi'*mat*dphi);
                     else
@@ -249,7 +253,11 @@ classdef H1Element < ofem_v2.elements.Finite_Elements & handle
 				end
 			end
 			
-			S=S*ofem_v2.tools.matrixarray(abs(detD));
+			if chver < 9
+				S=S*ofem_v2.tools.matrixarray(abs(detD));
+			else
+				S = pagemtimes(S,abs(detD));
+			end
 			
 			I = repmat(dofs,1,size(S,1))';
 			I = I(:);
@@ -261,6 +269,7 @@ classdef H1Element < ofem_v2.elements.Finite_Elements & handle
 		end
 		
 		function M = assembleMass(obj,phys,pIdx,mat)
+			refTet = phys.geometry.refTet(pIdx);
 			[w,l] = ofem_v2.tools.gaussSimplex(obj.dim,obj.degreeMass);
 			dofs = phys.DOFs.el2DOF(pIdx,:);
 			detD = phys.geometry.detD(:,:,pIdx);
@@ -272,8 +281,9 @@ classdef H1Element < ofem_v2.elements.Finite_Elements & handle
 			
 			M=ofem_v2.tools.matrixarray(zeros(Ns,Ns,Ne));
 			
-			chver = ver;
-            if str2num(chver(1,1).Version) >= 9.9
+			chver = split(version,'.');
+			chver = str2double(chver{2});
+            if chver >= 9
                 M = double(M);
                 detD = double(detD);
             end
@@ -289,16 +299,22 @@ classdef H1Element < ofem_v2.elements.Finite_Elements & handle
 				for q=1:Nq
 					cnt = ones(size(l(:,q),1),1);
 					lTemp = mat2cell(l(:,q),cnt);
-					phi = obj.phi(lTemp{:});
-					if str2num(chver(1,1).Version) < 9.9
-                        M = M+w(q)*(phi'*mat*phi);
+					phi(:,:,1) = obj.phi{1}(lTemp{:});
+					phi(:,:,2) = obj.phi{2}(lTemp{:});
+					if chver < 9
+						phi = ofem_v2.tools.matrixarray(phi);
+                        M = M+w(q)*(phi(:,:,refTet)'*mat*phi(:,:,refTet));
                     else
-                        M = M+w(q)*pagemtimes(phi,'transpose',mat*phi,'none');
+                        M = M+w(q)*pagemtimes(phi(:,:,refTet),'transpose',mat*phi(:,:,refTet),'none');
 					end
 				end
 			end
 			
-			M = M*ofem_v2.tools.matrixarray(abs(detD));
+			if chver < 9
+				M = M*ofem_v2.tools.matrixarray(abs(detD));
+			else
+				M = pagemtimes(M,abs(detD));
+			end
 			
 			I = repmat(dofs,1,size(M,1))';
 			%I = I(:);

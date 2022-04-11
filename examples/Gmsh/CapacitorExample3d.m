@@ -14,12 +14,6 @@ file = './geometry/planarCapacitor3D';
 mesh= ofem_v2.Geometry(); 
 mesh.load_from_msh(file);
 
-mesh.reorderAC;
-mesh.create_edges();
-mesh.create_faces();
-mesh.connectFa2Ed();
-mesh.jacobiandata;
-
 %% Choosing function space (Element type and order)
 %element = ofem_v2.P1Element(mesh); 
 %fe = ofem_v2.elements.loadFE('H1_3D_Order_1');
