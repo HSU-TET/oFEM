@@ -24,6 +24,7 @@ classdef Physical_Problem < handle
         b;
         
         M_robin;
+		M_robinPart;
         
         bc;
         ic;
@@ -112,7 +113,8 @@ classdef Physical_Problem < handle
 							obj.b = obj.b + obj.geometry.bd{3,i}.loadVector(obj);
 						elseif isa(obj.geometry.bd{3,i},'ofem_v2.boundary.MixedBoundary')
 							obj.b = obj.b + obj.geometry.bd{3,i}.loadVector(obj);
-							obj.M_robin = obj.M_robin + obj.geometry.bd{3,i}.assembleMass(obj);
+							obj.M_robinPart{i} = obj.geometry.bd{3,i}.assembleMass(obj);
+							obj.M_robin = obj.M_robin + obj.M_robinPart{i};
 						end
                     end
                 end
