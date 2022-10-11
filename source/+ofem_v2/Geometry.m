@@ -801,10 +801,11 @@ classdef Geometry < handle
                 warning('ofem:mesh:InvalidArgument',...
                         'file_name contains a path. I''ll ignore it');
             end
+          
             if isempty(ext)
-                file_name=strcat(file_name,'.inp');
+                ext='.inp';
             end
-            file_name=fullfile(folder_name,file_name);
+            file_name=fullfile(folder_name,[file_name,ext]);
 
 
             % basic computations________________________________________________
