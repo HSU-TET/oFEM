@@ -18,7 +18,7 @@ Coherence;
 Physical Surface("M:Paper") = {1};
 Physical Surface("M:Glas") = {2};
 
-Characteristic Length{:}= 0.005;
+Characteristic Length{:}= 0.0001;
 
 Mesh 2; 
 

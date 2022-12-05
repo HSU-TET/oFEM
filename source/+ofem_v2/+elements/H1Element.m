@@ -235,8 +235,12 @@ classdef H1Element < ofem_v2.elements.Finite_Elements & handle
 			if isa(mat,'function_handle')
 				elco = reshape(phys.geometry.co(:,:,el(pIdx,1:Nl)'),[],Nl,Ne);
 				for q=1:Nq
+					cnt = ones(size(l(:,q),1),1);
+					lTemp = mat2cell(l(:,q),cnt);
+					dphi(:,:,1) = obj.dPhi{1}(lTemp{:});
+					dphi(:,:,2) = obj.dPhi{2}(lTemp{:});
 					X = elco*(l(q,:)');
-					dphi = DinvT(:,:,pIdx)*obj.dPhi(l(1,q),l(2,q),l(3,q));
+					dphi = DinvT(:,:,pIdx)*dphi(:,:,refTet);
 					S = S+w(q)*(dphi'*mat(X)*dphi);
 				end
 			else
@@ -293,8 +297,12 @@ classdef H1Element < ofem_v2.elements.Finite_Elements & handle
 			if isa(mat,'function_handle')
 				elco = reshape(phys.geometry.co(:,:,el(pIdx,1:Nl)'),[],Nl,Ne);
 				for q=1:Nq
+					cnt = ones(size(l(:,q),1),1);
+					lTemp = mat2cell(l(:,q),cnt);
+					phi(:,:,1) = obj.phi{1}(lTemp{:});
+					phi(:,:,2) = obj.phi{2}(lTemp{:});
 					X = elco*(l(q,:)');
-					phi = obj.phi{1}(l(1,q),l(2,q),l(3,q));
+					phi = ofem_v2.tools.matrixarray(phi(:,:,refTet));
 					M = M+w(q)*(phi'*mat(X)*phi);
 				end
 			else
@@ -348,7 +356,7 @@ classdef H1Element < ofem_v2.elements.Finite_Elements & handle
 					X = loco*([l(:,q);1-sum(l(:,q))]);
 					cnt = ones(size(l(:,q),1),1);
 					lTemp = mat2cell(l(:,q),cnt);
-					phi = obj.phi(lTemp{:});
+					phi = obj.phi{1}(lTemp{:});
 					F = F+w(q)*(phi'*value(X));
 				end
 			elseif isa(value,'ofem_v2.tools.matrixarray')

@@ -61,10 +61,34 @@ dofs.generateDOFs;
 
 %% Assembly of the matrices and solving the equation
 capacitor.assemble(); 
-capacitor.solve(); 
+%capacitor.solve(); 
+S = capacitor.S;
+b = capacitor.b;
+u1 = capacitor.u;
+u2 = full(capacitor.u);
+
+degs = dofs.freeDOFs;
+tic
+u2(degs) = S(degs,degs)\b(degs);
+toc
+tic
+u1(degs) = S(degs,degs)\b(degs);
+toc
 
 %% Exporting the Data
 mesh.export_UCD([pwd,'/export'],['2dCapacitor'],{'U',capacitor.u,''});
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

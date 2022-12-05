@@ -10,7 +10,7 @@ Physical Surface("M:Domain") = 1;
 Physical Line("BD:Left") = 4;
 Physical Line("BD:Right") = 2;
 
-Characteristic Length{:} = 0.5;
+Characteristic Length{:} = 0.1;
 
 Mesh.MshFileVersion = 2;
 

@@ -67,7 +67,7 @@ tic
 disp("Solving System")
 L = ichol(voltage.S(dofs.freeDOFs,dofs.freeDOFs));
 
-u = voltage.u;
+u = full(voltage.u);
 u(dofs.freeDOFs) = pcg(voltage.S(dofs.freeDOFs,dofs.freeDOFs),voltage.b(dofs.freeDOFs),1e-9,10000,L,L');
 t = toc;
 disp("Done in:")
@@ -134,7 +134,7 @@ d = R*P*b(dofsNe.freeDOFs);
 [L,U] = ilu(abs(B));
 
 %%
-A_vec = v_potential.u;
+A_vec = full(v_potential.u);
 %gpuB = gpuArray(B);
 %gpud = gpuArray(d);
 %A_vec(dofsNe.freeDOFs) = bicgstab(A(dofsNe.freeDOFs,dofsNe.freeDOFs),b(dofsNe.freeDOFs),1e-6,20000,L,L');

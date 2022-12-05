@@ -115,15 +115,34 @@ opts.droptol = 1e-4;
 %L = ichol(A(dofsNe.freeDOFs,dofsNe.freeDOFs),opts);
 [L,U] = ilu(A(dofsNe.freeDOFs,dofsNe.freeDOFs));
 disp('here!')
+Lgpu = gpuArray(L);
+Ugpu = gpuArray(U);
+Agpu = gpuArray(complex(A(dofsNe.freeDOFs,dofsNe.freeDOFs)));
+bgpu = gpuArray(b(dofsNe.freeDOFs));
+
 
 %%
+tic
 A_vec = v_potential.u;
-A_vec(dofsNe.freeDOFs) = bicgstab(A(dofsNe.freeDOFs,dofsNe.freeDOFs),b(dofsNe.freeDOFs),1e-6,20000,L,U);
+A_vecgpu = gpuArray(A_vec(dofsNe.freeDOFs));
+Agpu = gpuArray(complex(A(dofsNe.freeDOFs,dofsNe.freeDOFs)));
+bgpu = gpuArray(b(dofsNe.freeDOFs));
+toc
+tic
+A_vecgpu = bicgstab(Agpu,bgpu,1e-6,2000);
+toc
+tic
+A_vecgpu = bicgstab(Agpu,bgpu,1e-6,5000);
+toc
+A_vec(dofsNe.freeDOFs) = gather(A_vecgpu);
+toc
 
 %%
-
+tic
 [~,A_rec] = ofem_v2.tools.reconstruct(v_potential,full(A_vec),1);
+toc
 [~,B] = ofem_v2.tools.reconstructCurl(v_potential,full(A_vec));
+toc
 
 %%
 
