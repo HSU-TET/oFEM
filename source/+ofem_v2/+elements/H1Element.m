@@ -233,15 +233,20 @@ classdef H1Element < ofem_v2.elements.Finite_Elements & handle
             end
 			
 			if isa(mat,'function_handle')
-				elco = reshape(phys.geometry.co(:,:,el(pIdx,1:Nl)'),[],Nl,Ne);
+				elco = reshape(phys.geometry.co(:,:,phys.geometry.el(pIdx,1:Nl)'),[],Nl,Ne);
 				for q=1:Nq
 					cnt = ones(size(l(:,q),1),1);
 					lTemp = mat2cell(l(:,q),cnt);
 					dphi(:,:,1) = obj.dPhi{1}(lTemp{:});
 					dphi(:,:,2) = obj.dPhi{2}(lTemp{:});
-					X = elco*(l(q,:)');
-					dphi = DinvT(:,:,pIdx)*dphi(:,:,refTet);
-					S = S+w(q)*(dphi'*mat(X)*dphi);
+					X = elco*[l(:,q);1-sum(l(:,q))];
+                    if chver < 9
+					    dphi = DinvT*ofem_v2.tools.matrixarray(dphi(:,:,refTet));
+					    S = S+w(q)*(dphi'*mat(X)*dphi);
+                    else
+                        dphi = pagemtimes(DinvT,dphi(:,:,refTet));
+					    S = S+w(q)*pagemtimes(dphi,'transpose',pagemtimes(mat(X),dphi),'none');
+                    end
 				end
 			else
 				for q=1:Nq
@@ -301,9 +306,14 @@ classdef H1Element < ofem_v2.elements.Finite_Elements & handle
 					lTemp = mat2cell(l(:,q),cnt);
 					phi(:,:,1) = obj.phi{1}(lTemp{:});
 					phi(:,:,2) = obj.phi{2}(lTemp{:});
-					X = elco*(l(q,:)');
-					phi = ofem_v2.tools.matrixarray(phi(:,:,refTet));
-					M = M+w(q)*(phi'*mat(X)*phi);
+					X = elco*[l(:,q);1-sum(l(:,q))];
+                    if chver < 9
+					    phi = ofem_v2.tools.matrixarray(phi(:,:,refTet));
+					    M = M+w(q)*(phi'*mat(X)*phi);
+                    else
+                        phi = phi(:,:,refTet);
+					    M = M+w(q)*pagemtimes(phi,'transpose',pagemtimes(mat(X),phi),'none');
+                    end
 				end
 			else
 				for q=1:Nq

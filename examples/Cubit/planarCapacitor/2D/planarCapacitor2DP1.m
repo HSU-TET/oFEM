@@ -35,10 +35,12 @@ dofs.generateDOFs();
 
 %% set materials
 leftMat = ofem_v2.materials.Material();
-leftMat.epsilon = 5*leftMat.eps0;
+mateqleft = @(X) leftMat.eps0*abs(double(X(1,:,:)));
+leftMat.epsilon = mateqleft;
 
 rightMat = ofem_v2.materials.Material();
-rightMat.epsilon = 5*rightMat.eps0;
+mateqright = @(X) leftMat.eps0*abs(double(X(1,:,:)));
+rightMat.epsilon = mateqright;
 
 mesh.setMaterial('LeftSide',leftMat);
 mesh.setMaterial('RightSide',rightMat);
