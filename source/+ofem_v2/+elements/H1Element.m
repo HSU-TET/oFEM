@@ -300,7 +300,7 @@ classdef H1Element < ofem_v2.elements.Finite_Elements & handle
             end
 
 			if isa(mat,'function_handle')
-				elco = reshape(phys.geometry.co(:,:,el(pIdx,1:Nl)'),[],Nl,Ne);
+				elco = reshape(phys.geometry.co(:,:,phys.geometry.el(pIdx,1:Nl)'),[],Nl,Ne);
 				for q=1:Nq
 					cnt = ones(size(l(:,q),1),1);
 					lTemp = mat2cell(l(:,q),cnt);
