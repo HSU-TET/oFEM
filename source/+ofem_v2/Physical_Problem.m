@@ -76,7 +76,7 @@ classdef Physical_Problem < handle
 			
 			obj.M_robin = sparse(Nc,Nc);
             
-            obj.u = sparse(Nc,1);
+            obj.u = zeros(Nc,1);
             
             obj.M_robin=sparse(Nc,Nc);
             
