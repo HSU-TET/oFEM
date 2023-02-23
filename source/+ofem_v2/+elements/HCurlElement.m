@@ -364,17 +364,19 @@ classdef HCurlElement < ofem_v2.elements.Finite_Elements & handle
             
             if isa(mat,'function_handle')
                 elco = reshape(phys.geometry.co(:,:,el(pIdx,1:Nl)'),[],Nl,Ne);
-                for q=1:Nq
+                for q=1:Nq 
                     X = elco*(l(q,:)');
                     phii = DinvT(:,:,pIdx)'*(obj.N(:,:,q).*sign);
                     M = M+w(q)*(phii'*mat(X)*phii);
                 end
             else
                 for q=1:Nq
-                    phi(:,:,1) = obj.N{1}(l(1,q),l(2,q),l(3,q));
-                    phi(:,:,2) = obj.N{2}(l(1,q),l(2,q),l(3,q));
-                    dphi(:,:,1) = obj.curlN{1}(l(1,q),l(2,q),l(3,q));
-                    dphi(:,:,2) = obj.curlN{2}(l(1,q),l(2,q),l(3,q));
+					cnt = ones(size(l(:,q),1),1);
+					lTemp = mat2cell(l(:,q),cnt);
+                    phi(:,:,1) = obj.N{1}(lTemp{:});
+                    phi(:,:,2) = obj.N{2}(lTemp{:});
+                    dphi(:,:,1) = obj.curlN{1}(lTemp{:});
+                    dphi(:,:,2) = obj.curlN{2}(lTemp{:});
                     phi =  DinvT*ofem_v2.tools.matrixarray(phi(:,:,refTet));
                     dphi =  cross(repmat(v,1,Ns,length(pIdx)),Dk*ofem_v2.tools.matrixarray(dphi(:,:,refTet)));
                     D = D+w(q)*(dphi'*mat*phi);
