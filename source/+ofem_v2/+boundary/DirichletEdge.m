@@ -10,31 +10,31 @@ classdef DirichletEdge < handle & ofem_v2.boundary.FixedBoundary
 		faces;
         interiors;
 		index;
-		boundaryName;
+		name;
 		
 		u;
 	end
 	
 	methods
-		function obj = DirichletEdge(value, boundaryName, mesh)
+		function obj = DirichletEdge(value, name, mesh)
 			if isscalar(value)
 				error('ofem_v2:boundaries:DirichletEdge',...
 						'Dirichlet boundary needs to be a vector');
 			end
             obj.value = value;
             
-			if ischar(boundaryName)
+			if ischar(name)
 				n = size(mesh.bd, 2);
 				for i = 1:n
-					if isequal(mesh.bd{1,i},boundaryName)
+					if isequal(mesh.bd{1,i},name)
 						obj.boundary = unique(sort(mesh.bd{2,i},2),'rows');
 						obj.index = i; 
 						break;
 					end
 				end
 			else
-				obj.boundary = unique(sort(mesh.bd{2,boundaryName},2),'rows');
-				obj.index = boundaryName;
+				obj.boundary = unique(sort(mesh.bd{2,name},2),'rows');
+				obj.index = name;
 			end
 			switch mesh.dim
 				case 2

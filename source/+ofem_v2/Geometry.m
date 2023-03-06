@@ -474,7 +474,7 @@ classdef Geometry < handle
             Idx = 1:size(obj.el,1);
             for i=1:size(msh{2,1},2)
                 if startsWith(msh{2,1}{1,i},'M:')
-                    obj.parts{1,part} = msh{2,1}{1,i}(3:end); % Er schreibt es da nicht rein :'(                 
+                    obj.parts{1,part} = msh{2,1}{1,i}(3:end);                
                     if obj.dim == 2
                         obj.parts{3,part} = Idx(msh{2,3}{2,2}(:,1)==msh{2,1}{2,i});
                         obj.parts{2,part} = 1; %Material extension
@@ -495,9 +495,9 @@ classdef Geometry < handle
                     end
                     bd = bd+1;
 				end
-				if startsWith(msh{2,1}{1,i},'ROI0:')
-                    obj.roi{1,roi} = msh{2,1}{1,i}(6:end);
-                    obj.roi{2,roi} = msh{2,3}{2,1}(msh{2,3}{2,1}(:,1)==msh{2,1}{2,i},2:end);
+				if startsWith(msh{2,1}{1,i},'ROI:')
+                    obj.roi{1,roi} = msh{2,1}{1,i}(5:end);
+                    obj.roi{2,roi} = msh{2,3}{2,2}(msh{2,3}{2,2}(:,1)==msh{2,1}{2,i},2:end);
                     roi = roi+1;
 				end
 				if startsWith(msh{2,1}{1,i},'ROI1:')
