@@ -88,7 +88,7 @@ classdef Neumann < handle & ofem_v2.boundary.NaturalBoundary
 				for q  = 1:Nq
 					cnt = ones(size(l(:,q),1),1);
 					lTemp = mat2cell(l(:,q),cnt);
-					phi = obj.feBd.phi(lTemp{:});
+					phi = obj.feBd.phi{1}(lTemp{:});
 					val = obj.value(obj.normalVector);
 					F = F + val'*(w(q)*phi);
 				end
@@ -96,7 +96,7 @@ classdef Neumann < handle & ofem_v2.boundary.NaturalBoundary
 				for q=1:Nq
 					cnt = ones(size(l(:,q),1),1);
 					lTemp = mat2cell(l(:,q),cnt);
-					phi = obj.feBd.phi(lTemp{:});
+					phi = obj.feBd.phi{1}(lTemp{:});
 					F = F + ofem_v2.tools.matrixarray(obj.value*(w(q)*phi'))';
 				end
 			end
