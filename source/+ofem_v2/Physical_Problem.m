@@ -145,9 +145,11 @@ classdef Physical_Problem < handle
 										x = input(['[1] ',obj.geometry.bd{3,i}.name,' or [2] ',obj.geometry.bd{3,j}.name,'\n>> ']);
 										if x == 1
 											obj.geometry.bd{3,j}.nodes(nonzeros(idx)) = [];
+                                            obj.geometry.bd{3,j}.value(nonzeros(idx)) = [];
 											break;
 										elseif x == 2
 											obj.geometry.bd{3,i}.nodes(idx~=0) = [];
+                                            obj.geometry.bd{3,i}.value(idx~=0) = [];
 											break;
 										else
 											disp('Invalid Input!')
