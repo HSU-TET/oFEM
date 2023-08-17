@@ -239,11 +239,28 @@ classdef HCurlElement < ofem_v2.elements.Finite_Elements & handle
             end
             
             if isa(mat,'function_handle')
-                elco = reshape(phys.geometry.co(:,:,el(pIdx,1:Nl)'),[],Nl,Ne);
+                elco = reshape(phys.geometry.co(:,:,phys.geometry.el(pIdx,1:Nl)'),[],Nl,Ne);
                 for q=1:Nq
-                    X = elco*(l(q,:)');
-                    dphii = Dk(:,:,pIdx)*(obj.curlN(:,:,q).*sign);
-                    S = S+w(q)*(dphii'*mat(X)*dphii);
+					cnt = ones(size(l(:,q),1),1);
+					ltemp = [l(:,q)',(1-sum(l(:,q)))'];
+                    X = elco*ltemp';
+					lTemp = mat2cell(l(:,q),cnt);
+                    dphi(:,:,1) = obj.curlN{1}(lTemp{:});
+                    dphi(:,:,2) = obj.curlN{2}(lTemp{:});
+                    %S = S+w(q)*(dphii'*mat(X)*dphii);
+					if ~chver
+                        dphi =  ofem_v2.tools.matrixarray(dphi(:,:,refTet));
+						if obj.dim == 3
+							dphi = Dk*dphi;
+						end
+                        S = S+w(q)*(dphi'*mat(X)*dphi);
+                    else
+                        dphi = dphi(:,:,refTet);
+						if obj.dim == 3
+							dphi = pagemtimes(Dk,dphi);
+						end
+                        S = S+w(q)*pagemtimes(dphi,'transpose',pagemtimes(double(mat(X)),dphi),'none');
+                    end
                 end
             else
                 for q=1:Nq
