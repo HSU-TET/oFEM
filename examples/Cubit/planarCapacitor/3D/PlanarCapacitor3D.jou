@@ -62,7 +62,7 @@ mesh volume all
 
 ############################# save ###########################################################
 #
-export abaqus "/Users/nilskielian/Documents/GitHub/oFEM/examples/Cubit/PlanarCapacitor/3D/PlanarCapacitor3D.inp" everything dimension 3 overwrite #cubitids
+export abaqus "./PlanarCapacitor3D.inp" everything dimension 3 overwrite #cubitids
 #
 #
 #

@@ -61,10 +61,11 @@ mesh surf all
 
 ############################# save ###########################################################
 #
-export abaqus "/Users/nilskielian/Documents/GitHub/oFEM/examples/Cubit/PlanarCapacitor2D.inp" everything dimension 2 overwrite #cubitids
+export abaqus "./PlanarCapacitor2D.inp" everything dimension 2 overwrite #cubitids
 #
 #
 #
+
 
 
 

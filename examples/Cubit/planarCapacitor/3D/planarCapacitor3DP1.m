@@ -23,8 +23,8 @@ fprintf('done t=%f\n',t);
 
 
 %% define function space discretization
-fe = ofem_v2.elements.H1Element(3,1);
-fe.computeBasis;
+fe = ofem_v2.elements.loadFE('H1_3D_Order_1');
+%fe.computeBasis;
 
 
 %% create DOFs
@@ -38,7 +38,7 @@ leftMat = ofem_v2.materials.Material();
 leftMat.epsilon = 5*leftMat.eps0;
 
 rightMat = ofem_v2.materials.Material();
-rightMat.epsilon = 5*rightMat.eps0;
+rightMat.epsilon = 10*rightMat.eps0;
 
 mesh.setMaterial('LeftSide',leftMat);
 mesh.setMaterial('RightSide',rightMat);
