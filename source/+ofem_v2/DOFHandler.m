@@ -93,6 +93,9 @@ classdef DOFHandler < handle
             fDofs = [];
             iDofs = [];
             for i = 1:size(phys.geometry.bd,2)
+                if isempty(phys.geometry.bd{3,i})
+                    continue;
+                end
                 nDofs = setdiff(nDofs,phys.geometry.bd{3,i}.nodes);
                 if deg > 0
                     eDofs = 1:Ned;
