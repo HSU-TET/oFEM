@@ -5,7 +5,7 @@ file = 'tempCube';
 mesh = ofem_v2.Geometry;
 mesh.load_from_msh(file);
 
-fe = ofem_v2.elements.loadFE('H1_3D_Order_1');
+fe = ofem_v2.elements.loadFE('H1_3D_Order_2');
 
 dofs = ofem_v2.DOFHandler(mesh);
 dofs.attach(fe);
@@ -15,7 +15,7 @@ square = ofem_v2.materials.Material;
 square.stiff = 1;
 square.mass = 1;
 
-feBd = ofem_v2.elements.loadFE('H1_2D_Order_1');
+feBd = ofem_v2.elements.loadFE('H1_2D_Order_2');
 
 % Input in case of heat equation:
 % Temperature

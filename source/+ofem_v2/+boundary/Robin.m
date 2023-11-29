@@ -69,10 +69,10 @@ classdef Robin < handle & ofem_v2.boundary.MixedBoundary
 			N = max(physicalProblem.DOFs.DOFs);
 			dofs = [];
 			if ~isempty(physicalProblem.DOFs.n2DOF)
-				dofs = [dofs;physicalProblem.DOFs.n2DOF(obj.nodes)];
+				dofs = [dofs;physicalProblem.geometry.fa(obj.faces,:)];
 			end
 			if ~isempty(physicalProblem.DOFs.e2DOF)
-				dofs = [dofs;physicalProblem.DOFs.e2DOF(obj.edges)];
+				dofs = [dofs,physicalProblem.DOFs.e2DOF(physicalProblem.geometry.fa2ed(obj.faces,:))];
 			end
 			if ~isempty(physicalProblem.DOFs.f2DOF)
 				dofs = [dofs;physicalProblem.DOFs.f2DOF(obj.faces)];
@@ -106,7 +106,7 @@ classdef Robin < handle & ofem_v2.boundary.MixedBoundary
 			end
 			
 			F = F*obj.meas*obj.beta;
-			I = obj.boundary';
+			I = dofs';
 			obj.b = sparse(I(:),1,F(:),N,1);
 			b = obj.b;
 		end
@@ -117,11 +117,11 @@ classdef Robin < handle & ofem_v2.boundary.MixedBoundary
 			N = max(physicalProblem.DOFs.DOFs);
 			dofs = [];
 			if ~isempty(physicalProblem.DOFs.n2DOF)
-				dofs = [dofs;physicalProblem.DOFs.n2DOF(obj.nodes)];
+				dofs = [dofs;physicalProblem.geometry.fa(obj.faces,:)];
 			end
 			if ~isempty(physicalProblem.DOFs.e2DOF)
-				dofs = [dofs;physicalProblem.DOFs.e2DOF(obj.edges)];
-			end
+				dofs = [dofs,physicalProblem.DOFs.e2DOF(physicalProblem.geometry.fa2ed(obj.faces,:))];
+            end
 			if ~isempty(physicalProblem.DOFs.f2DOF)
 				dofs = [dofs;physicalProblem.DOFs.f2DOF(obj.faces)];
 			end
@@ -153,8 +153,10 @@ classdef Robin < handle & ofem_v2.boundary.MixedBoundary
 				end
 			end
 			
-			I = repmat(obj.boundary,1,size(M,1))';
-			J = repelem(obj.boundary',size(M,1),1);
+			I = repmat(dofs,1,6)';
+            I = I(:);
+			J = repelem(dofs,1,6)';
+            J = J(:);
 			M = M*obj.meas;
 			obj.M = sparse(I(:),J(:),M(:),N,N);
 			M = obj.M;

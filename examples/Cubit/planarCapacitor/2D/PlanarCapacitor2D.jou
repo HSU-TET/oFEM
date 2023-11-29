@@ -49,7 +49,7 @@ sideset 2 name "RightPlate"
 ################################# scheme and size ##################################################
 
 surf all scheme trimesh
-#surf all size {mesh_size}
+surf all size {mesh_size}
 
 #################################### mesh ##########################################################
 

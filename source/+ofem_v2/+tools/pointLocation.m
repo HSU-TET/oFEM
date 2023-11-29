@@ -38,7 +38,7 @@ function [idx, tr, bary] = pointLocation(obj, xq, opt)
     end
     
     pp  = double(reshape(permute(obj.co,[3,1,2]),[],size(obj.co,1)));
-    tol = 1e-8;
+    tol = 1e-12;
     tp  = [];  %#ok<NASGU>
     tj  = [];  %#ok<NASGU>
     %tr  = []; 
