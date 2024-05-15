@@ -153,9 +153,9 @@ classdef Robin < handle & ofem_v2.boundary.MixedBoundary
 				end
 			end
 			
-			I = repmat(dofs,1,6)';
+			I = repmat(dofs,1,Ns)';
             I = I(:);
-			J = repelem(dofs,1,6)';
+			J = repelem(dofs,1,Ns)';
             J = J(:);
 			M = M*obj.meas;
 			obj.M = sparse(I(:),J(:),M(:),N,N);
