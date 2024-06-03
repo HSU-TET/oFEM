@@ -70,32 +70,7 @@ J = kappa*E;
 mesh.export_UCD([pwd,'/export'],'voltage',{'U',u,''},{'E',squeeze(E)','','Cell'}, {'J',squeeze(J)','','Cell'});
 
 %%
-feNe = ofem_v2.elements.loadFE('HCurl_3D_Order_0');
-
-dofsNe = ofem_v2.DOFHandler(mesh);
-dofsNe.attach(feNe);
-
-v_potential = ofem_v2.Physical_Problem(feNe,mesh,1,1,0);
-v_potential.attachDOFHandler(dofsNe);
-
-v_potential.setParaS('mu');
-v_potential.setParaM('kappa');
-
-upperBD = ofem_v2.boundary.DirichletEdge([0,0,0]','Upper',mesh);
-lowerBD = ofem_v2.boundary.DirichletEdge([0,0,0]','Lower',mesh);
-PECBD = ofem_v2.boundary.DirichletEdge([0,0,0]','PEC',mesh);
-
-v_potential.setBoundaryCondition(upperBD);
-v_potential.setBoundaryCondition(lowerBD);
-v_potential.setBoundaryCondition(PECBD);
-
-force = ofem_v2.Volume_force(J,'Coil',mesh);
-
-mesh.setForce('Coil',force);
-
-dofsNe.generateDOFs;
-v_potential.assemble();
-
+c
 %%
 S = v_potential.S;
 M = v_potential.M;

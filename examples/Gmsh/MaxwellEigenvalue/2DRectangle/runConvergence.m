@@ -1,14 +1,14 @@
 close all;
 clear;
 
-nh = 1;
+nh = 3;
 no = 2;
 err = zeros(14,nh,no+1);
 
 file = 'rect';
 
 for i = 1:nh
-	system(sprintf('gmsh.exe rect.geo -setnumber h %d -2 -v 0', i));
+	system(sprintf('gmsh rect.geo -setnumber h %d -2 -v 0', i));
 	
 	mesh = ofem_v2.Geometry;
 	mesh.load_from_msh(file);

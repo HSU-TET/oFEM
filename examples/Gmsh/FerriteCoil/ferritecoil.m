@@ -68,7 +68,7 @@ disp("Solving System")
 L = ichol(voltage.S(dofs.freeDOFs,dofs.freeDOFs));
 
 u = full(voltage.u);
-u(dofs.freeDOFs) = pcg(voltage.S(dofs.freeDOFs,dofs.freeDOFs),voltage.b(dofs.freeDOFs),1e-9,10000,L,L');
+u(dofs.freeDOFs) = pcg(voltage.S(dofs.freeDOFs,dofs.freeDOFs),voltage.b(dofs.freeDOFs),1e-9,1000,L,L');
 t = toc;
 disp("Done in:")
 disp(t)
@@ -81,7 +81,7 @@ kappa(1,1,mesh.parts{3,2}) = iron.kappa;
 
 J = kappa*E;
 
-mesh.export_UCD([pwd,'/export'],'voltage',{'U',u,''},{'E',squeeze(E)','','Cell'}, {'J',squeeze(J)','','Cell'});
+% mesh.export_UCD([pwd,'/export'],'voltage',{'U',u,''},{'E',squeeze(E)','','Cell'}, {'J',squeeze(J)','','Cell'});
 
 %%
 tic;
@@ -103,9 +103,9 @@ lowerBD = ofem_v2.boundary.DirichletEdge([0,0,0]','LowerPort',mesh);
 v_potential.setBoundaryCondition(upperBD);
 v_potential.setBoundaryCondition(lowerBD);
 
-force = ofem_v2.Volume_force(J,'Coil',mesh);
-
-mesh.setForce('Coil',force);
+% force = ofem_v2.Volume_force(J,'Coil',mesh);
+% 
+% mesh.setForce('Coil',force);
 
 dofsNe.generateDOFs;
 v_potential.assemble();

@@ -321,11 +321,31 @@ classdef HCurlElement < ofem_v2.elements.Finite_Elements & handle
             end
             
             if isa(mat,'function_handle')
-                elco = reshape(phys.geometry.co(:,:,el(pIdx,1:Nl)'),[],Nl,Ne);
+                elco = reshape(phys.geometry.co(:,:,phys.geometry.el(pIdx,1:Nl)'),[],Nl,Ne);
                 for q=1:Nq
-                    X = elco*(l(q,:)');
-                    phii = DinvT(:,:,pIdx)'*(obj.N(:,:,q).*sign);
-                    M = M+w(q)*(phii'*mat(X)*phii);
+                    cnt = ones(size(l(:,q),1),1);
+					ltemp = [l(:,q)',(1-sum(l(:,q)))'];
+                    X = elco*ltemp';
+					lTemp = mat2cell(l(:,q),cnt);
+                    phi(:,:,1) = obj.N{1}(lTemp{:});
+                    phi(:,:,2) = obj.N{2}(lTemp{:});
+
+                    % X = elco*(l(q,:)');
+                    % phii = DinvT(:,:,pIdx)'*(obj.N(:,:,q).*sign(Ne));
+                    % M = M+w(q)*(phii'*mat(X)*phii);
+                    if ~chver
+                        phi =  DinvT*ofem_v2.tools.matrixarray(phi(:,:,refTet));
+						if obj.dim == 3
+							phi = DinvT*phi;
+						end
+                        M = M+w(q)*(phi'*mat(X)*phi);
+                    else
+                        phi = phi(:,:,refTet);
+						if obj.dim == 3
+							phi = pagemtimes(DinvT,phi);
+						end
+                        M = M+w(q)*pagemtimes(phi,'transpose',pagemtimes(double(mat(X)),phi),'none');
+                    end    
                 end
             else
                 for q=1:Nq

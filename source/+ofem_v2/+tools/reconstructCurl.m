@@ -13,7 +13,13 @@ function [X,U] = reconstructCurl(phys,u)
     Dk = phys.geometry.Dk;
     detD = phys.geometry.detD;
     Ne = phys.geometry.Nint;
-    l(4,:) = 1-sum(l,1);
+
+        if phys.element.dim == 2
+            l(3,:) = 1-sum(l,1);
+        elseif phys.element.dim ==3    
+            l(4,:) = 1-sum(l,1);
+        end
+
     Nl = size(l,1);
     Np = size(l,2);
     elco = reshape(phys.geometry.co(:,:,phys.geometry.el(:,:)'),[],Nl,Ne);
@@ -21,6 +27,7 @@ function [X,U] = reconstructCurl(phys,u)
     for i = 1:Np
         X(:,:,i) = reshape(elco*l(:,i),3,[]);
     end    
+
     elu = ofem_v2.tools.matrixarray(reshape(u(phys.DOFs.el2DOF(:,:)'),[],1,Ne));
     for q = 1:Np
         dphi(:,:,1) = phys.element.curlN{1}(l(1,q),l(2,q),l(3,q));
