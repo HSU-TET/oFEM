@@ -374,7 +374,7 @@ classdef H1Element < ofem_v2.elements.Finite_Elements & handle
 					cnt = ones(size(l(:,q),1),1);
 					lTemp = mat2cell(l(:,q),cnt);
 					phi = obj.phi{1}(lTemp{:});
-					F = F+w(q)*(phi'*value);
+					F = F+w(q)*pagemtimes(phi,'none',double(value),'none');
 				end
 			else
 				for q=1:Nq

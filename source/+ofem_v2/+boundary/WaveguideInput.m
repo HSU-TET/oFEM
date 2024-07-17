@@ -86,7 +86,7 @@ classdef WaveguideInput < handle & ofem_v2.boundary.FixedBoundary
 			v2 = phys.geometry.co(:,:,phys.geometry.ed(obj.edges,2));
 			xq = (v1+v2)/2;
 			xq = xq(1:2,:,:);
-			n = 5;		
+			n = 10;%5;		
     		co_idx = knnsearch(obj.x',squeeze(xq)','K',n)';
 		
     		ui_x = (sum((reshape(obj.u_in(1,co_idx(:,:)'),[],n)),2)/n);
