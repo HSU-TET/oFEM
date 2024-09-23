@@ -1,4 +1,4 @@
-classdef AbsorbingBoundaryCondition < handle & ofem_v2.boundary.FixedBoundary
+classdef AbsorbingBoundaryCondition < handle & ofem_v2.boundary.MixedBoundary
 	%AbsorbingBoundaryCondition Summary of this class goes here
 	%   Detailed explanation goes here
 
@@ -14,84 +14,86 @@ classdef AbsorbingBoundaryCondition < handle & ofem_v2.boundary.FixedBoundary
         normalVector;
         feBd;
         dim;
+		factor;
 
         M;
 	end
 
     
     methods
-        function objtest = AbsorbingBoundaryCondition(feBd,phys,mesh,name,n)
-            objtest.normalVector = n;
-            objtest.feBd = ofem_v2.elements.loadFE('HCurl_2D_Order_0');
-            objtest.dim = objtest.feBd.dim;
+        function obj = AbsorbingBoundaryCondition(feBd,phys,mesh,name,n,factor)
+            obj.normalVector = n;
+			obj.factor = factor;
+            obj.feBd = ofem_v2.elements.loadFE('HCurl_2D_Order_0');
+            obj.dim = obj.feBd.dim;
 			if ischar(name)
 				n = size(mesh.bd, 2);
 				for i = 1:n
 					if isequal(mesh.bd{1,i},name)
-						objtest.boundary = unique(sort(mesh.bd{2,i},2),'rows');
-						objtest.index = i;
+						obj.boundary = unique(sort(mesh.bd{2,i},2),'rows');
+						obj.index = i;
 						break;
 					end
 				end
 			else
-				objtest.boundary = unique(sort(mesh.bd{2,name},2),'rows');
-				objtest.index = name;
+				obj.boundary = unique(sort(mesh.bd{2,name},2),'rows');
+				obj.index = name;
 			end
 			switch mesh.dim
 			case 2
-				[~,objtest.edges] = ismember(sort(objtest.boundary,2),mesh.ed,'rows');
-				objtest.edges = unique(objtest.edges);
-				objtest.nodes = unique(objtest.boundary(:));
+				[~,obj.edges] = ismember(sort(obj.boundary,2),mesh.ed,'rows');
+				obj.edges = unique(obj.edges);
+				obj.nodes = unique(obj.boundary(:));
 			case 3
-				[~,objtest.faces] = ismember(sort(objtest.boundary,2),mesh.fa,'rows');
-				objtest.faces = unique(objtest.faces);
-				objtest.edges = mesh.fa2ed(objtest.faces,:);
-				objtest.edges = unique(objtest.edges(:));
-				objtest.nodes = unique(objtest.boundary(:));
+				[~,obj.faces] = ismember(sort(obj.boundary,2),mesh.fa,'rows');
+				obj.faces = unique(obj.faces);
+				obj.edges = mesh.fa2ed(obj.faces,:);
+				obj.edges = unique(obj.edges(:));
+				obj.nodes = unique(obj.boundary(:));
             end
         end
 
 
-        function M = assembleMass(objtest, physicalProblem,func)
-			[w,l] = ofem_v2.tools.gaussSimplex(objtest.dim,objtest.feBd.degreeMass);
+        function M = assembleMass(obj, physicalProblem)
+			[w,l] = ofem_v2.tools.gaussSimplex(obj.dim,obj.feBd.degreeMass);
 			
-            [~,idx] = ismember(objtest.faces,physicalProblem.geometry.el2fa(:));
+            [~,idx] = ismember(obj.faces,physicalProblem.geometry.el2fa(:));
 			elIdx = mod(idx-1,physicalProblem.geometry.Nint)+1;
 			faIdx = floor(idx/physicalProblem.geometry.Nint)+1;
 			refTet = physicalProblem.geometry.refTet(elIdx);
-			refTet = refTet.*faIdx;
+			% refTet = refTet.*faIdx;
             DinvT = physicalProblem.geometry.DinvT(:,:,refTet);
 
             %calculate the edges on boundary for basis function evaluation
             %very annoying 
-            edgeIdx = physicalProblem.geometry.fa2ed(objtest.faces,:);
+            edgeIdx = physicalProblem.geometry.fa2ed(obj.faces,:);
             edgeIdx = repmat(edgeIdx(:), [1,size(physicalProblem.geometry.el2ed,2)]);
             % nodesofEdge = physicalProblem.geometry.ed(edgeIdx(:),:);
             % nodesofEdge = [physicalProblem.geometry.ed(edgeIdx(:,1),:) physicalProblem.geometry.ed(edgeIdx(:,2),:) physicalProblem.geometry.ed(edgeIdx(:,3),:)];%reshape(nodesofEdge,[length(objtest.faces),6])
             [isEdge,~]=ismember(physicalProblem.geometry.el2ed(elIdx,:),edgeIdx);
-            isEdge = repmat(reshape(isEdge',[1,size(physicalProblem.geometry.el2ed,2), length(objtest.faces)]),[3,1]);
+            isEdge = repmat(reshape(isEdge',[1,size(physicalProblem.geometry.el2ed,2), length(obj.faces)]),[3,1]);
 
 			N = max(physicalProblem.DOFs.DOFs);
 			dofs = [];
 			if ~isempty(physicalProblem.DOFs.n2DOF)
-				dofs = [dofs;physicalProblem.geometry.fa(objtest.faces,:)];
+				dofs = [dofs;physicalProblem.geometry.fa(obj.faces,:)];
 			end
 			if ~isempty(physicalProblem.DOFs.e2DOF)
-				dofs = [dofs,physicalProblem.DOFs.e2DOF(physicalProblem.geometry.fa2ed(objtest.faces,:))];
+				dofs = [dofs,physicalProblem.DOFs.e2DOF(physicalProblem.geometry.fa2ed(obj.faces,:))];
             end
 			if ~isempty(physicalProblem.DOFs.f2DOF)
-				dofs = [dofs;physicalProblem.DOFs.f2DOF(objtest.faces)];
+				dofs = [dofs;physicalProblem.DOFs.f2DOF(obj.faces)];
 			end
 			
 			Nl     = size(l  ,2); % number of barycentric coordinates
 			Nq     = size(w  ,1);
-			Ns     = objtest.feBd.DOFsPerElement;
+			Ns     = obj.feBd.DOFsPerElement;
 			Nf     = size(physicalProblem.geometry.el,1);
             Ne     = length(refTet);
 
-            v1 = physicalProblem.geometry.co(:,:,physicalProblem.geometry.fa(objtest.faces,1));
-            v2 = physicalProblem.geometry.co(:,:,physicalProblem.geometry.fa(objtest.faces,2));
-            v3 = physicalProblem.geometry.co(:,:,physicalProblem.geometry.fa(objtest.faces,3));
+            v1 = physicalProblem.geometry.co(:,:,physicalProblem.geometry.fa(obj.faces,1));
+            v2 = physicalProblem.geometry.co(:,:,physicalProblem.geometry.fa(obj.faces,2));
+            v3 = physicalProblem.geometry.co(:,:,physicalProblem.geometry.fa(obj.faces,3));
 
             vec1 = v2-v1;
             vec2 = v3-v1;
@@ -110,7 +112,7 @@ classdef AbsorbingBoundaryCondition < handle & ofem_v2.boundary.FixedBoundary
 			%M      = ofem_v2.tools.matrixarray(zeros(Ns,Ns,Nf));
 			M=ofem_v2.tools.matrixarray(zeros(Ns,Ns,Ne));
 
-			if isa(objtest.value,'function_handle')
+			if isa(obj.value,'function_handle')
 				% for q  = 1:Nq
 				% 	cnt = ones(size(l(:,q),1),1);
 				% 	lTemp = mat2cell(l(:,q),cnt);
@@ -122,28 +124,28 @@ classdef AbsorbingBoundaryCondition < handle & ofem_v2.boundary.FixedBoundary
 				for q=1:Nq
 					cnt = ones(size(l(:,q),1),1);
 					lTemp = mat2cell(l(:,q),cnt);
-                    phi(:,:,1) = objtest.feBd.N{1}(lTemp{:});
-                    phi(:,:,2) = objtest.feBd.N{2}(lTemp{:});
+                    phi(:,:,1) = obj.feBd.N{1}(lTemp{:});
+                    phi(:,:,2) = obj.feBd.N{2}(lTemp{:});
                     phi =  ofem_v2.tools.matrixarray(phi(:,:,refTet));
                     phi = circshift(phi,1,1);
                     phi = DinvT*phi;
-                    % phi(:,phi(1,:,1)==0,:) = [];
-                    % normal_reshaped = repmat(reshape(objtest.normalVector, [3, 1, 1]), [1, size(phi,2), size(phi,3)]);
-                    % M = M+w(q)*pagemtimes(double(phi),'transpose',double(func*phi),'none');
-					M = M + w(q)*pagemtimes(double(func*phi),'transpose',double(phi),'none');
+					M = M + w(q)*pagemtimes(double(phi),'transpose',double(phi),'none');
                     clear phi;
 				end
             end
-            dofs = physicalProblem.geometry.fa2ed(objtest.faces,:);
-			M = M*abs(detD);
+            dofs = physicalProblem.geometry.fa2ed(obj.faces,:);
+			M = M*abs(detD)*obj.factor;
 			I = repmat(dofs,1,Ns)';
             I = I(:);
 			J = repelem(dofs,1,Ns)';
             J = J(:);
-			objtest.M = sparse(I(:),J(:),M(:),N,N);
-			M = objtest.M;
+			obj.M = sparse(I(:),J(:),M(:),N,N);
+			M = obj.M;
 		end
-            % 			figure
-            %             spy(M)
-        end
+		
+		function b = loadVector(obj, physicalProblem)
+			b = 0;
+		end
+	end
+
 end    
