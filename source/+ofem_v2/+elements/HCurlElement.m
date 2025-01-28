@@ -444,7 +444,7 @@ classdef HCurlElement < ofem_v2.elements.Finite_Elements & handle
             refTet = phys.geometry.refTet(pIdx);
             
             if isa(f,'function_handle')
-                elco = reshape(phys.geometry.co(:,:,el(pIdx,1:Nl)'),[],Nl,Ne);
+                elco = reshape(phys.geometry.co(:,:,phys.geometry.el(pIdx,1:Nl)'),[],Nl,Ne);
                 for q=1:Nq
                     X = elco*([l(:,q);1-sum(l(:,q))]);
                     A = ofem_v2.tools.matrixarray(f(X));
