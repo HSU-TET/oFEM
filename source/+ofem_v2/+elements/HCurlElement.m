@@ -446,10 +446,12 @@ classdef HCurlElement < ofem_v2.elements.Finite_Elements & handle
             if isa(f,'function_handle')
                 elco = reshape(phys.geometry.co(:,:,el(pIdx,1:Nl)'),[],Nl,Ne);
                 for q=1:Nq
-                    X = elco*(l(q,:)');
-                    A = f(X);
-                    phii = DinvT(:,:,pIdx)*(obj.N(:,:,q).*sign);
-                    F = F+w(q)*(A'*phii);
+                    X = elco*([l(:,q);1-sum(l(:,q))]);
+                    A = ofem_v2.tools.matrixarray(f(X));
+                    phi(:,:,1) = obj.N{1}(l(1,q),l(2,q),l(3,q));
+                    phi(:,:,2) = obj.N{2}(l(1,q),l(2,q),l(3,q));
+                    phi =  DinvT*ofem_v2.tools.matrixarray(phi(:,:,refTet));
+                    F = F+w(q)*(A'*phi);
                 end
             elseif isa(f,'ofem_v2.tools.matrixarray')
                 for q=1:Nq
