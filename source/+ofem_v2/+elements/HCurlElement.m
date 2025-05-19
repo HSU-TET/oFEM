@@ -414,9 +414,9 @@ classdef HCurlElement < ofem_v2.elements.Finite_Elements & handle
                     phi(:,:,2) = obj.N{2}(lTemp{:});
                     dphi(:,:,1) = obj.curlN{1}(lTemp{:});
                     dphi(:,:,2) = obj.curlN{2}(lTemp{:});
-                    phi =  DinvT*ofem_v2.tools.matrixarray(phi(:,:,refTet));
-                    dphi =  cross(repmat(v,1,Ns,length(pIdx)),Dk*ofem_v2.tools.matrixarray(dphi(:,:,refTet)));
-                    D = D+w(q)*(dphi'*mat*phi);
+                    phi =  cross(repmat(v,1,Ns,length(pIdx)),DinvT*ofem_v2.tools.matrixarray(phi(:,:,refTet)));
+                    dphi =  Dk*ofem_v2.tools.matrixarray(dphi(:,:,refTet));
+                    D = D+w(q)*(phi'*mat*dphi);
                 end
             end
             
