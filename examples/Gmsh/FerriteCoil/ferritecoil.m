@@ -103,9 +103,9 @@ lowerBD = ofem_v2.boundary.DirichletEdge([0,0,0]','LowerPort',mesh);
 v_potential.setBoundaryCondition(upperBD);
 v_potential.setBoundaryCondition(lowerBD);
 
-% force = ofem_v2.Volume_force(J,'Coil',mesh);
-% 
-% mesh.setForce('Coil',force);
+force = ofem_v2.Volume_force(J,'Coil',mesh);
+
+mesh.setForce('Coil',force);
 
 dofsNe.generateDOFs;
 v_potential.assemble();

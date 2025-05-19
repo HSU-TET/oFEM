@@ -444,12 +444,14 @@ classdef HCurlElement < ofem_v2.elements.Finite_Elements & handle
             refTet = phys.geometry.refTet(pIdx);
             
             if isa(f,'function_handle')
-                elco = reshape(phys.geometry.co(:,:,el(pIdx,1:Nl)'),[],Nl,Ne);
+                elco = reshape(phys.geometry.co(:,:,phys.geometry.el(pIdx,1:Nl)'),[],Nl,Ne);
                 for q=1:Nq
-                    X = elco*(l(q,:)');
-                    A = f(X);
-                    phii = DinvT(:,:,pIdx)*(obj.N(:,:,q).*sign);
-                    F = F+w(q)*(A'*phii);
+                    X = elco*([l(:,q);1-sum(l(:,q))]);
+                    A = ofem_v2.tools.matrixarray(f(X));
+                    phi(:,:,1) = obj.N{1}(l(1,q),l(2,q),l(3,q));
+                    phi(:,:,2) = obj.N{2}(l(1,q),l(2,q),l(3,q));
+                    phi =  DinvT*ofem_v2.tools.matrixarray(phi(:,:,refTet));
+                    F = F+w(q)*(A'*phi);
                 end
             elseif isa(f,'ofem_v2.tools.matrixarray')
                 for q=1:Nq
@@ -475,6 +477,62 @@ classdef HCurlElement < ofem_v2.elements.Finite_Elements & handle
             end
             
             F = F'*abs(detD);
+            
+            I = dofs';
+            I = I(:);
+            
+            F = sparse(I(:),1,F(:),phys.DOFs.Nd,1);
+		end
+
+		function F = derivativeForce(obj,phys,f,pIdx)
+            [w,l] = ofem_v2.tools.gaussSimplex(obj.dim,obj.degreeMass);
+            dofs = phys.DOFs.el2DOF(pIdx,:);
+            detD = phys.geometry.detD(:,:,pIdx);
+            Dk = phys.geometry.Dk(:,:,pIdx);
+            
+            Ns = obj.DOFsPerElement;
+            Nq = size(w   ,1);
+            Ne = length(pIdx);
+            Nl = size(phys.geometry.el,2);
+            
+            F = ofem_v2.tools.matrixarray(zeros(1,Ns,Ne));
+            
+            refTet = phys.geometry.refTet(pIdx);
+            
+            if isa(f,'function_handle')
+                elco = reshape(phys.geometry.co(:,:,phys.geometry.el(pIdx,1:Nl)'),[],Nl,Ne);
+                for q=1:Nq
+                    X = elco*([l(:,q);1-sum(l(:,q))]);
+                    A = ofem_v2.tools.matrixarray(f(X));
+                    phi(:,:,1) = obj.curlN{1}(l(1,q),l(2,q),l(3,q));
+                    phi(:,:,2) = obj.curlN{2}(l(1,q),l(2,q),l(3,q));
+                    phi =  Dk*ofem_v2.tools.matrixarray(phi(:,:,refTet));
+                    F = F+w(q)*(A'*phi);
+                end
+            elseif isa(f,'ofem_v2.tools.matrixarray')
+                for q=1:Nq
+                    phi(:,:,1) = obj.curlN{1}(l(1,q),l(2,q),l(3,q));
+                    phi(:,:,2) = obj.curlN{2}(l(1,q),l(2,q),l(3,q));
+                    phi =  Dk*ofem_v2.tools.matrixarray(phi(:,:,refTet));
+                    F = F+w(q)*(f'*phi);
+%                 % accepts rhs data converted to integration points of the
+%                 % shape dim(f) dim(q) dim(el)
+%                     phi(:,:,1) = obj.curlN{1}(l(1,q),l(2,q),l(3,q));
+%                     phi(:,:,2) = obj.curlN{2}(l(1,q),l(2,q),l(3,q));
+%                     phi =  DinvT*ofem_v2.tools.matrixarray(phi(:,:,refTet));
+%                     F = F+w(q)*(f(:,q,:)'*phi);
+                end
+            else
+                f = ofem_v2.tools.matrixarray(repmat(f,1,1,Ne));
+                for q=1:Nq
+                    phi(:,:,1) = obj.curlN{1}(l(1,q),l(2,q),l(3,q));
+                    phi(:,:,2) = obj.curlN{2}(l(1,q),l(2,q),l(3,q));
+                    phi =  Dk*ofem_v2.tools.matrixarray(phi(:,:,refTet));
+                    F = F+w(q)*(f'*phi);
+                end
+            end
+            
+            F = F;
             
             I = dofs';
             I = I(:);
