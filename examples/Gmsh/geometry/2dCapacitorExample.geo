@@ -13,12 +13,11 @@ Coherence;
 
 Physical Line("BD:left") = {4};
 Physical Line("BD:right")= {6};
-Coherence;
 
 Physical Surface("M:Paper") = {1};
 Physical Surface("M:Glas") = {2};
 
-Characteristic Length{:}= 0.0001;
+Characteristic Length{:}= 0.01;
 
 Mesh 2; 
 
