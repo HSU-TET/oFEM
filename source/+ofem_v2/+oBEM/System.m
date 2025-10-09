@@ -73,7 +73,7 @@ classdef System < handle
             S = sparse(I,J,S,obj.mesh.Nco,obj.mesh.Nco);
             S = S+S';
 
-            [Ss,Is,Js] = obj.singleSingular;
+            [Ss,Is,Js] = obj.singleSingular2;
 
             Ss = sparse(Js,Is,Ss,obj.mesh.Nco,obj.mesh.Nco);
 
@@ -81,8 +81,11 @@ classdef System < handle
         end
 
         function [S,I,J] = single(obj)
-            [w,l] = ofem_v2.tools.gaussSimplex(2,4);
-            l(3,:) = 1-sum(l,1);
+            [wi,li] = ofem_v2.tools.gaussSimplex(2,2);
+            [wj,lj] = ofem_v2.tools.gaussSimplex(2,3);
+
+            li(3,:) = 1-sum(li,1);
+            lj(3,:) = 1-sum(lj,1);
 
             % Create reduced system -> 1,2 1,3 2,3 1,4 2,4 3,4...
             % This way we only compute the upper triangular matrix
@@ -97,21 +100,21 @@ classdef System < handle
 
             S = zeros(3,3,size(idxi,1));
 
-            for i=1:size(w,1)
-                ri = pagemtimes(vi,l([3,1,2],i));
-                cnt = ones(size(l(1:2,i),1),1);
-				lTemp = mat2cell(l(1:2,i),cnt);
+            for i=1:size(wi,1)
+                ri = pagemtimes(vi,li([3,1,2],i));
+                cnt = ones(size(li(1:2,i),1),1);
+				lTemp = mat2cell(li(1:2,i),cnt);
                 phii(:,:) = obj.fe.phi{1}(lTemp{:});
-                for j = 1:size(w,1)
-                    rj = pagemtimes(vj,l([3,1,2],j));
-                    cnt = ones(size(l(1:2,j),1),1);
-					lTemp = mat2cell(l(1:2,j),cnt);
+                for j = 1:size(wj,1)
+                    rj = pagemtimes(vj,lj([3,1,2],j));
+                    cnt = ones(size(lj(1:2,j),1),1);
+					lTemp = mat2cell(lj(1:2,j),cnt);
                     phij(:,:) = obj.fe.phi{1}(lTemp{:});
 
                     rn = pagenorm(ri-rj);
                     G = 1/(4*pi)*pageinv(rn);
 
-                    w_tot = w(i)*w(j)*pagemtimes(obj.detD(:,:,idxi),obj.detD(:,:,idxj));
+                    w_tot = wi(i)*wj(j)*pagemtimes(obj.detD(:,:,idxi),obj.detD(:,:,idxj));
                     cont = pagemtimes(pagemtimes(phii,'transpose',phij,'none'),G);
 
                     S = S + pagemtimes(w_tot,cont);
@@ -131,19 +134,65 @@ classdef System < handle
             S = S(:);
         end
 
+        function [S,I,J] = singleSingular2(obj)
+            [wi,li] = gquts7;%ofem_v2.tools.gaussSimplex(2,6);
+            [wj,lj] = gqutm9;%ofem_v2.tools.gaussSimplex(2,6);
+
+            li(3,:) = 1-sum(li,1);
+            lj(3,:) = 1-sum(lj,1);
+
+            % Create reduced system -> 1,2 1,3 2,3 1,4 2,4 3,4...
+            % This way we only compute the upper triangular matrix
+            % Singular diagonal is handled seperately
+            vi = obj.r;
+            vj = obj.r;
+
+            S = zeros(3,3,size(obj.gamma,1));
+
+            for i=1:size(wi,1)
+                ri = pagemtimes(vi,li([3,1,2],i));
+                cnt = ones(size(li(1:2,i),1),1);
+				lTemp = mat2cell(li(1:2,i),cnt);
+                phii(:,:) = obj.fe.phi{1}(lTemp{:});
+                for j = 1:size(wj,1)
+                    rj = pagemtimes(vj,lj([3,1,2],j));
+                    cnt = ones(size(lj(1:2,j),1),1);
+					lTemp = mat2cell(lj(1:2,j),cnt);
+                    phij(:,:) = obj.fe.phi{1}(lTemp{:});
+
+                    rn = pagenorm(ri-rj);
+                    G = 1/(4*pi)*pageinv(rn);
+
+                    w_tot = wi(i)*wj(j);
+                    cont = pagemtimes(pagemtimes(phii,'transpose',phij,'none'),G);
+
+                    S = S + pagemtimes(w_tot,cont);
+                end
+            end
+            %S = pagemtimes(S,pagemtimes(obj.detD(:,:,idxi),obj.detD(:,:,idxj)));
+            %S = pagemtimes(S,'transpose',[1/3,1/3,1/3],'none');
+
+            S = pagemtimes(S,obj.detD.^2)/4;
+            I = repmat(obj.gamma',3,1);
+            I = I(:);
+            J = repelem(obj.gamma',3,1);
+            J = J(:);
+            S = S(:);
+        end
+
         function [S,I,J] = singleSingular(obj)
-            [w,l] = ofem_v2.tools.gaussSimplex(1,4);
+            [wi,li] = ofem_v2.tools.gaussSimplex(1,4);
 
             S = zeros(3,3,size(obj.r,3));
             AB = pagenorm(obj.Dk(:,2,:)-obj.Dk(:,1,:));
             test = 1;
-            for i = 1:size(w,1)
-                for j = 1:size(w,1)
-                    for k = 1:size(w,1)
-                        x = l(i);
-                        y = l(j);
-                        z = l(k);
-                        wiwjwk = w(i)*w(j)*w(k);
+            for i = 1:size(wi,1)
+                for j = 1:size(wi,1)
+                    for k = 1:size(wi,1)
+                        x = li(i);
+                        y = li(j);
+                        z = li(k);
+                        wiwjwk = wi(i)*wi(j)*wi(k);
 
                         li = [x*(1-y);x*y];
                         lj = [x*(1-z);x*z];
