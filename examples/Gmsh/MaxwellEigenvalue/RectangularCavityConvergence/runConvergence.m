@@ -8,7 +8,7 @@ err = zeros(20,nh,no+1);
 file = 'rect';
 
 for i = 1:nh
-	system(sprintf('gmsh.app rect.geo -setnumber h %d -3 -v 0', i));
+	system(sprintf('gmsh rect.geo -setnumber h %d -3 -v 0', i));
 	
 	mesh = ofem_v2.Geometry;
 	mesh.load_from_msh(file);
