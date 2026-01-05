@@ -67,13 +67,7 @@ b = capacitor.b;
 u1 = capacitor.u;
 u2 = full(capacitor.u);
 
-degs = dofs.freeDOFs;
-tic
-u2(degs) = S(degs,degs)\b(degs);
-toc
-tic
-u1(degs) = S(degs,degs)\b(degs);
-toc
+capacitor.solve;
 
 %% Exporting the Data
 mesh.export_UCD([pwd,'/export'],['2dCapacitor'],{'U',capacitor.u,''});

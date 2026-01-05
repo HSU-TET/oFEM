@@ -17,7 +17,7 @@ Physical Line("BD:right")= {6};
 Physical Surface("M:Paper") = {1};
 Physical Surface("M:Glas") = {2};
 
-Characteristic Length{:}= 0.01;
+Characteristic Length{:}= 0.001;
 
 Mesh 2; 
 

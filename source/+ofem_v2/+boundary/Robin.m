@@ -41,11 +41,10 @@ classdef Robin < handle & ofem_v2.boundary.MixedBoundary
 			switch mesh.dim
 				case 2
 					[~,obj.edges] = ismember(sort(obj.boundary,2),mesh.ed,'rows');
-					obj.edges = unique(obj.edges);
 					obj.nodes = unique(obj.boundary(:));
 					edges = mesh.co(:,:,mesh.bd{2, obj.index}(:,2))- mesh.co(:,:,mesh.bd{2, obj.index}(:,1));
-					obj.meas = ofem_v2.tools.matrixarray(sqrt(dot(edges,edges,1)));
-					obj.normalVector = -edges.rot*(1/obj.meas);
+					obj.meas = sqrt(pagemtimes(edges,'transpose',edges,'none'));
+					obj.normalVector = pagemtimes(pagemtimes([0,1;-1,0],edges),pageinv(obj.meas));
 					obj.dim = 1;
 					obj.elems = size(obj.edges,1);
 				case 3
@@ -69,7 +68,15 @@ classdef Robin < handle & ofem_v2.boundary.MixedBoundary
 			N = max(physicalProblem.DOFs.DOFs);
 			dofs = [];
 			if ~isempty(physicalProblem.DOFs.n2DOF)
-				dofs = [dofs;physicalProblem.geometry.fa(obj.faces,:)];
+                if obj.dim == 2
+				    dofs = [dofs;physicalProblem.geometry.fa(obj.faces,:)];
+                elseif obj.dim == 1
+                    nodes = physicalProblem.geometry.ed(obj.edges,:)';
+                    nodes = nodes(:);
+                    tmp = physicalProblem.DOFs.n2DOF(nodes,:)';
+                    tmp = tmp(:);
+                    dofs = [dofs;tmp];
+                end
 			end
 			if ~isempty(physicalProblem.DOFs.e2DOF)
 				dofs = [dofs,physicalProblem.DOFs.e2DOF(physicalProblem.geometry.fa2ed(obj.faces,:))];
@@ -86,7 +93,7 @@ classdef Robin < handle & ofem_v2.boundary.MixedBoundary
 			% faceco gives global quadrature points => eval there
 			%faceco = reshape(physicalProblem.geometry.co(:,:,obj.bd(:,1:Nl)'),[],Nl,Nf);
 			
-			F      = ofem_v2.tools.matrixarray(zeros(1,Ns,Nf));
+			F      = zeros(1,Ns,Nf);
 			
 			if isa(obj.value,'function_handle')
 				for q  = 1:Nq
@@ -105,7 +112,7 @@ classdef Robin < handle & ofem_v2.boundary.MixedBoundary
 				end
 			end
 			
-			F = F*obj.meas*obj.beta;
+			F = pagemtimes(pagemtimes(F,obj.meas),obj.beta);
 			I = dofs';
 			obj.b = sparse(I(:),1,F(:),N,1);
 			b = obj.b;
@@ -117,7 +124,15 @@ classdef Robin < handle & ofem_v2.boundary.MixedBoundary
 			N = max(physicalProblem.DOFs.DOFs);
 			dofs = [];
 			if ~isempty(physicalProblem.DOFs.n2DOF)
-				dofs = [dofs;physicalProblem.geometry.fa(obj.faces,:)];
+                if obj.dim == 2
+				    dofs = [dofs;physicalProblem.geometry.fa(obj.faces,:)];
+                elseif obj.dim == 1
+                    nodes = physicalProblem.geometry.ed(obj.edges,:)';
+                    nodes = nodes(:);
+                    tmp = physicalProblem.DOFs.n2DOF(nodes,:)';
+                    tmp = tmp(:);
+                    dofs = [dofs;tmp];
+                end
 			end
 			if ~isempty(physicalProblem.DOFs.e2DOF)
 				dofs = [dofs,physicalProblem.DOFs.e2DOF(physicalProblem.geometry.fa2ed(obj.faces,:))];
@@ -134,7 +149,7 @@ classdef Robin < handle & ofem_v2.boundary.MixedBoundary
 			% faceco gives global quadrature points => eval there
 			%faceco = reshape(physicalProblem.geometry.co(:,:,obj.bd(:,1:Nl)'),[],Nl,Nf);
 			
-			M      = ofem_v2.tools.matrixarray(zeros(Ns,Ns,Nf));
+			M      = zeros(Ns,Ns,Nf);
 			
 			if isa(obj.value,'function_handle')
 				for q  = 1:Nq
@@ -157,7 +172,7 @@ classdef Robin < handle & ofem_v2.boundary.MixedBoundary
             I = I(:);
 			J = repelem(dofs,1,Ns)';
             J = J(:);
-			M = M*obj.meas;
+			M = pagemtimes(M,obj.meas);
 			obj.M = sparse(I(:),J(:),M(:),N,N);
 			M = obj.M;
 		end

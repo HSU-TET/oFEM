@@ -454,12 +454,12 @@ classdef Geometry < handle
             
             if(isempty(msh{2,3}{2,3}))
                 msh{2,2}{2,1}(:,3) = [];
-                obj.co = ofem_v2.tools.matrixarray(reshape(msh{2,2}{2,1}',2,1,[]));
+                obj.co = reshape(msh{2,2}{2,1}',2,1,[]);
                 obj.dim = 2;
                 obj.type = 'tri';
                 obj.el = msh{2,3}{2,2}(:,2:4);
             else
-                obj.co = ofem_v2.tools.matrixarray(reshape(msh{2,2}{2,1}',3,1,[]));
+                obj.co = reshape(msh{2,2}{2,1}',3,1,[]);
                 obj.dim = 3;
                 obj.type = 'tet';
                 obj.el = msh{2,3}{2,3}(:,2:5);
@@ -551,7 +551,7 @@ classdef Geometry < handle
 
             %% coordinates
             % size(obj.co)=[Nd,1,Nco], always column vectors
-            obj.co  = ofem_v2.tools.matrixarray(permute(inp{2,1}{2,1},[2,3,1]));
+            obj.co  = permute(inp{2,1}{2,1},[2,3,1]);
             obj.Nco = size(obj.co,3);
             obj.dim = size(obj.co,1);
 
@@ -986,7 +986,7 @@ classdef Geometry < handle
                 case 'edge'
                     % edge
                     tmp=obj.co(:,1,obj.el(:,2))-obj.co(:,1,obj.el(:,1));
-                    obj.DinvT = 1/tmp;
+                    obj.DinvT = pageinv(tmp);
                     obj.detD  = tmp;
 
                 case 'tri'
@@ -996,9 +996,9 @@ classdef Geometry < handle
 					
 					obj.Dk = [e12,e13];
 
-                    obj.detD = dot(rot(e12),e13,1);
+                    obj.detD = pagemtimes(pagemtimes([0,-1;1,0],e12),'transpose',e13,'none');
 
-                    obj.DinvT = [ -rot(e13), rot(e12) ]./obj.detD;
+                    obj.DinvT = pagetranspose(pageinv(obj.Dk));
 
                 case 'quad'
                     % quadrilateral

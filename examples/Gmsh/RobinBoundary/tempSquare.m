@@ -53,7 +53,7 @@ for i = 1:100
 	
 	u = LHS\RHS;
 	
-	mesh.export_UCD([pwd,'/export'],[file,num2str(i)],{'T',u,''});
+	mesh.export_UCD([pwd,'/export'],[file,num2str(100+i)],{'T',u,''});
 end
 	
 	
