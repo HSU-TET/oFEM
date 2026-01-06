@@ -59,9 +59,9 @@ classdef DirichletEdge < handle & ofem_v2.boundary.FixedBoundary
 			v1 = phys.geometry.co(:,:,phys.geometry.ed(obj.edges,1));
 			v2 = phys.geometry.co(:,:,phys.geometry.ed(obj.edges,2));
 			tang = v2-v1;
-			tang = tang*ofem_v2.tools.matrixarray(1/vecnorm(tang));
+			tang = pagemtimes(tang,pageinv(pagenorm(tang)));
 
-			b = ofem_v2.tools.matrixarray(zeros(size(eDofs)));
+			b = zeros(size(eDofs));
 			%obj.b = ofem_v2.tools.matrixarray(reshape(obj.b,1,size(eDofs,2),[]));
 
 			for q = 1:length(w)
@@ -71,7 +71,7 @@ classdef DirichletEdge < handle & ofem_v2.boundary.FixedBoundary
 					phi = phys.element.N{1}(l(q),0);
 				end
 				phi = phi(1,1:phys.element.degree+1);
-				b = b + (obj.value'*tang);
+				b = b + pagemtimes(obj.value,'transpose',tang,'none');
 			end
 
 			obj.u = sparse(eDofs(:),1,b(:),phys.DOFs.Nd,1);

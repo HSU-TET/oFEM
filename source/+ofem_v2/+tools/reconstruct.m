@@ -18,14 +18,14 @@ function [X,U] = reconstruct(phys,u,order)
     elco = reshape(phys.geometry.co(:,:,phys.geometry.el(:,:)'),[],Nl,Ne);
     X = zeros(3,Ne,Np);
     for i = 1:Np
-        X(:,:,i) = reshape(elco*l(:,i),3,[]);
+        X(:,:,i) = reshape(pagemtimes(elco,l(:,i)),3,[]);
     end
-    elu = ofem_v2.tools.matrixarray(reshape(u(phys.DOFs.el2DOF(:,:)'),[],1,Ne));
+    elu = reshape(u(phys.DOFs.el2DOF(:,:)'),[],1,Ne);
     for q = 1:Np
         phi(:,:,1) = phys.element.N{1}(l(1,q),l(2,q),l(3,q));
         phi(:,:,2) = phys.element.N{2}(l(1,q),l(2,q),l(3,q));
-        phi = ofem_v2.tools.matrixarray(phi(:,:,phys.geometry.refTet));
-        U(:,:,q) = reshape((DinvT*phi)*elu,3,[]);
+        phi = phi(:,:,phys.geometry.refTet);
+        U(:,:,q) = reshape(pagemtimes(pagemtimes(DinvT,phi),elu),3,[]);
     end
         
 end

@@ -75,11 +75,11 @@ disp(t)
 %%
 E = -voltage.gradCell(full(u));
 
-kappa = ofem_v2.tools.matrixarray(zeros(1,1,mesh.Nint));
+kappa = zeros(1,1,mesh.Nint);
 kappa(1,1,mesh.parts{3,1}) = copper.kappa;
 kappa(1,1,mesh.parts{3,2}) = iron.kappa;
 
-J = kappa*E;
+J = pagemtimes(kappa,E);
 
 % mesh.export_UCD([pwd,'/export'],'voltage',{'U',u,''},{'E',squeeze(E)','','Cell'}, {'J',squeeze(J)','','Cell'});
 
@@ -121,7 +121,7 @@ M = v_potential.M;
 
 b = v_potential.b;
 
-omega = 2*pi*1e6; % 1MHz
+omega = 2*pi*1e3; % 1MHz
 
 A = S + 1i*omega*M;
 [P,R,C] = equilibrate(A(dofsNe.freeDOFs,dofsNe.freeDOFs));
@@ -131,15 +131,17 @@ d = R*P*b(dofsNe.freeDOFs);
 %L = ichol(M(dofsNe.freeDOFs,dofsNe.freeDOFs));
 %L = ichol(B);
 %[L,U] = ilu(A(dofsNe.freeDOFs,dofsNe.freeDOFs));
-[L,U] = ilu(abs(B));
+%[L,U] = ilu(abs(B));
+prec = diag(diag(B));
 
 %%
 A_vec = full(v_potential.u);
 %gpuB = gpuArray(B);
 %gpud = gpuArray(d);
 %A_vec(dofsNe.freeDOFs) = bicgstab(A(dofsNe.freeDOFs,dofsNe.freeDOFs),b(dofsNe.freeDOFs),1e-6,20000,L,L');
-y = bicgstabl(B,d,1e-6,2000,L,U);
-%y = gmres(B,d,300,1e-6,30);
+%y = bicgstabl(B,d,1e-6,2000,L,U);
+%y = bicgstabl(B,d,1e-4,2000,abs(prec));
+y = gmres(B,d,30,1e-6,300,prec);
 A_vec(dofsNe.freeDOFs) = C*y;
 t = toc;
 disp("Done in:")
@@ -153,9 +155,9 @@ disp(t)
 %%
 
 H = B;
-H(:,mesh.parts{3,1}) = H(:,mesh.parts{3,1})/mesh.parts{2,1}.mu;
-H(:,mesh.parts{3,2}) = H(:,mesh.parts{3,2})/mesh.parts{2,2}.mu;
-H(:,mesh.parts{3,3}) = H(:,mesh.parts{3,3})/mesh.parts{2,3}.mu;
+H(:,mesh.parts{3,1}) = pagemrdivide(H(:,mesh.parts{3,1}),mesh.parts{2,1}.mu);
+H(:,mesh.parts{3,2}) = pagemrdivide(H(:,mesh.parts{3,2}),mesh.parts{2,2}.mu);
+H(:,mesh.parts{3,3}) = pagemrdivide(H(:,mesh.parts{3,3}),mesh.parts{2,3}.mu);
 
 %%
 mesh.export_UCD([pwd,'/export'], 'field', {'B_i',imag(B)','','Cell'},{'A_i',imag(A_rec)','','Cell'},...

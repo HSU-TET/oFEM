@@ -25,15 +25,19 @@ function [X,U] = reconstructCurl(phys,u)
     elco = reshape(phys.geometry.co(:,:,phys.geometry.el(:,:)'),[],Nl,Ne);
     X = zeros(3,Ne,Np);
     for i = 1:Np
-        X(:,:,i) = reshape(elco*l(:,i),3,[]);
+        X(:,:,i) = reshape(pagemtimes(elco,l(:,i)),3,[]);
     end    
 
-    elu = ofem_v2.tools.matrixarray(reshape(u(phys.DOFs.el2DOF(:,:)'),[],1,Ne));
+    elu = reshape(u(phys.DOFs.el2DOF(:,:)'),[],1,Ne);
     for q = 1:Np
         dphi(:,:,1) = phys.element.curlN{1}(l(1,q),l(2,q),l(3,q));
         dphi(:,:,2) = phys.element.curlN{2}(l(1,q),l(2,q),l(3,q));
-        dphi = ofem_v2.tools.matrixarray(dphi(:,:,phys.geometry.refTet));
-        U(:,:,q) = reshape((Dk*dphi)*elu*ofem_v2.tools.matrixarray(1/(detD)),3,[]);
+        dphi = dphi(:,:,phys.geometry.refTet);
+        if size(dphi,1)==3
+            dphi = pagemtimes(Dk,dphi);
+        end
+        U(:,:,q) = reshape(pagemtimes(pagemtimes(dphi,elu),pageinv(detD)),3,[]);
+        
     end
     
     

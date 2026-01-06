@@ -364,9 +364,16 @@ classdef HCurlElement < ofem_v2.elements.Finite_Elements & handle
                     if obj.dim == 3
                         dphi = pagemtimes(Dk*dphi);
                     end
+                    % inflate dphi from 1D to 3D
+                    if obj.dim == 2
+                        dphi = [zeros(size(dphi));zeros(size(dphi));dphi];
+                    end
                     dphi =  cross(repmat(v,1,Ns,length(pIdx)),dphi);
                     phi =  pagemtimes(DinvT,phi(:,:,refTet));
-                    D = D+w(q)*pagemtimes(phi',mat*dphi);
+                    if obj.dim == 2
+                        phi(3,:,:) = 0;
+                    end
+                    D = D+w(q)*pagemtimes(phi,"transpose",pagemtimes(mat,dphi));
                 end
             end
 
@@ -404,11 +411,16 @@ classdef HCurlElement < ofem_v2.elements.Finite_Elements & handle
                     F = F+w(q)*pagemtimes(A,'transpose',phi,'none');
                 end
             elseif size(f,3)>1
+                f = f(:,:,pIdx);
                 for q=1:Nq
                     phi(:,:,1) = obj.N{1}(l(1,q),l(2,q),l(3,q));
                     phi(:,:,2) = obj.N{2}(l(1,q),l(2,q),l(3,q));
                     phi =  pagemtimes(DinvT,phi(:,:,refTet));
-                    F = F+w(q)*pagemtimes(f,'transpose',phi,'none');
+                    if size(f,2)>1
+                        F = F+w(q)*pagemtimes(f(:,q,:),'transpose',phi,'none');
+                    else
+                        F = F+w(q)*pagemtimes(f,'transpose',phi,'none');
+                    end
                     %                 % accepts rhs data converted to integration points of the
                     %                 % shape dim(f) dim(q) dim(el)
                     %                     phi(:,:,1) = obj.curlN{1}(l(1,q),l(2,q),l(3,q));
