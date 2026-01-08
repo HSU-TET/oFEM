@@ -12,20 +12,28 @@ function [X,U] = reconstruct(phys,u,order)
     [~,l] = ofem_v2.tools.gaussSimplex(phys.element.dim,order);%phys.element.degreeMass);
     DinvT = phys.geometry.DinvT;
     Ne = phys.geometry.Nint;
-    l(4,:) = 1-sum(l,1);
+    dim = phys.geometry.dim;
+    if dim == 3
+        l(4,:) = 1-sum(l,1);
+    end
+    if dim == 2
+        l(3,:) = 1-sum(l,1);
+    end
     Nl = size(l,1);
     Np = size(l,2);
     elco = reshape(phys.geometry.co(:,:,phys.geometry.el(:,:)'),[],Nl,Ne);
-    X = zeros(3,Ne,Np);
+    X = zeros(dim,Ne,Np);
     for i = 1:Np
-        X(:,:,i) = reshape(pagemtimes(elco,l(:,i)),3,[]);
+        X(:,:,i) = reshape(pagemtimes(elco,l(:,i)),dim,[]);
     end
     elu = reshape(u(phys.DOFs.el2DOF(:,:)'),[],1,Ne);
     for q = 1:Np
-        phi(:,:,1) = phys.element.N{1}(l(1,q),l(2,q),l(3,q));
-        phi(:,:,2) = phys.element.N{2}(l(1,q),l(2,q),l(3,q));
-        phi = phi(:,:,phys.geometry.refTet);
-        U(:,:,q) = reshape(pagemtimes(pagemtimes(DinvT,phi),elu),3,[]);
+        cnt = ones(size(l(1:end-1,q),1),1);
+        lTemp = mat2cell(l(1:end-1,q),cnt);
+        phi(:,:,1) = phys.element.N{1}(lTemp{:});
+        phi(:,:,2) = phys.element.N{2}(lTemp{:});
+        phi = pagemtimes(DinvT,phi(:,:,phys.geometry.refTet));
+        U(:,:,q) = reshape(pagemtimes(pagemtimes(DinvT,phi),elu),dim,[]);
     end
         
 end

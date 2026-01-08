@@ -13,30 +13,35 @@ function [X,U] = reconstructCurl(phys,u)
     Dk = phys.geometry.Dk;
     detD = phys.geometry.detD;
     Ne = phys.geometry.Nint;
+    dim = phys.geometry.dim;
 
-        if phys.element.dim == 2
-            l(3,:) = 1-sum(l,1);
-        elseif phys.element.dim ==3    
-            l(4,:) = 1-sum(l,1);
-        end
+    if dim == 2
+        l(3,:) = 1-sum(l,1);
+        outsize = 1;
+    elseif dim ==3    
+        l(4,:) = 1-sum(l,1);
+        outsize = 3;
+    end
 
     Nl = size(l,1);
     Np = size(l,2);
     elco = reshape(phys.geometry.co(:,:,phys.geometry.el(:,:)'),[],Nl,Ne);
-    X = zeros(3,Ne,Np);
+    X = zeros(dim,Ne,Np);
     for i = 1:Np
-        X(:,:,i) = reshape(pagemtimes(elco,l(:,i)),3,[]);
+        X(:,:,i) = reshape(pagemtimes(elco,l(:,i)),dim,[]);
     end    
 
     elu = reshape(u(phys.DOFs.el2DOF(:,:)'),[],1,Ne);
     for q = 1:Np
-        dphi(:,:,1) = phys.element.curlN{1}(l(1,q),l(2,q),l(3,q));
-        dphi(:,:,2) = phys.element.curlN{2}(l(1,q),l(2,q),l(3,q));
+        cnt = ones(size(l(1:end-1,q),1),1);
+        lTemp = mat2cell(l(1:end-1,q),cnt);
+        dphi(:,:,1) = phys.element.curlN{1}(lTemp{:});
+        dphi(:,:,2) = phys.element.curlN{2}(lTemp{:});
         dphi = dphi(:,:,phys.geometry.refTet);
         if size(dphi,1)==3
             dphi = pagemtimes(Dk,dphi);
         end
-        U(:,:,q) = reshape(pagemtimes(pagemtimes(dphi,elu),pageinv(detD)),3,[]);
+        U(:,:,q) = reshape(pagemtimes(pagemtimes(dphi,elu),pageinv(detD)),outsize,[]);
         
     end
     

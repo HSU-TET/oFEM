@@ -354,6 +354,7 @@ classdef HCurlElement < ofem_v2.elements.Finite_Elements & handle
                 end
             else
                 for q=1:Nq
+                    clear phi dphi
                     cnt = ones(size(l(:,q),1),1);
                     lTemp = mat2cell(l(:,q),cnt);
                     phi(:,:,1) = obj.N{1}(lTemp{:});
@@ -369,11 +370,12 @@ classdef HCurlElement < ofem_v2.elements.Finite_Elements & handle
                         dphi = [zeros(size(dphi));zeros(size(dphi));dphi];
                     end
                     dphi =  cross(repmat(v,1,Ns,length(pIdx)),dphi);
+                    
                     phi =  pagemtimes(DinvT,phi(:,:,refTet));
                     if obj.dim == 2
                         phi(3,:,:) = 0;
                     end
-                    D = D+w(q)*pagemtimes(phi,"transpose",pagemtimes(mat,dphi));
+                    D = D+w(q)*pagemtimes(phi,"transpose",pagemtimes(mat,dphi),'none');
                 end
             end
 
@@ -413,8 +415,10 @@ classdef HCurlElement < ofem_v2.elements.Finite_Elements & handle
             elseif size(f,3)>1
                 f = f(:,:,pIdx);
                 for q=1:Nq
-                    phi(:,:,1) = obj.N{1}(l(1,q),l(2,q),l(3,q));
-                    phi(:,:,2) = obj.N{2}(l(1,q),l(2,q),l(3,q));
+                    cnt = ones(size(l(:,q),1),1);
+                    lTemp = mat2cell(l(:,q),cnt);
+                    phi(:,:,1) = obj.N{1}(lTemp{:});
+                    phi(:,:,2) = obj.N{2}(lTemp{:});
                     phi =  pagemtimes(DinvT,phi(:,:,refTet));
                     if size(f,2)>1
                         F = F+w(q)*pagemtimes(f(:,q,:),'transpose',phi,'none');
