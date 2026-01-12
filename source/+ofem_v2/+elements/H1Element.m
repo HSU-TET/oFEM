@@ -287,7 +287,8 @@ classdef H1Element < ofem_v2.elements.Finite_Elements & handle
                     lTemp = mat2cell(l(:,q),cnt);
                     phi(:,:,1) = obj.phi{1}(lTemp{:});
                     phi(:,:,2) = obj.phi{2}(lTemp{:});
-                    M = M+w(q)*pagemtimes(phi(:,:,refTet),'transpose',mat*phi(:,:,refTet),'none');
+                    phi = phi(:,:,refTet);
+                    M = M+w(q)*pagemtimes(phi,'transpose',mat*phi,'none');
                 end
             end
             M = pagemtimes(M,abs(detD));
@@ -305,6 +306,7 @@ classdef H1Element < ofem_v2.elements.Finite_Elements & handle
 
         function b = volumeForce(obj,phys,value,pIdx)
             [w,l] = ofem_v2.tools.gaussSimplex(obj.dim,obj.degreeMass);
+            refTet = phys.geometry.refTet(pIdx);
             dofs = phys.DOFs.el2DOF(pIdx,:);
             detD = phys.geometry.detD(:,:,pIdx);
 
@@ -313,7 +315,7 @@ classdef H1Element < ofem_v2.elements.Finite_Elements & handle
             Ne = length(pIdx);
             Nl = size(phys.geometry.el,2);
 
-            F = ofem_v2.tools.matrixarray(zeros(Ns,1,Ne));
+            F = zeros(Ns,1,Ne);
 
 
             if isa(value,'function_handle')
@@ -325,23 +327,25 @@ classdef H1Element < ofem_v2.elements.Finite_Elements & handle
                     phi = obj.phi{1}(lTemp{:});
                     F = F+w(q)*(phi'*value(X));
                 end
-            elseif isa(value,'ofem_v2.tools.matrixarray')
+            elseif size(value,3)>1
                 for q=1:Nq
                     cnt = ones(size(l(:,q),1),1);
                     lTemp = mat2cell(l(:,q),cnt);
-                    phi = obj.phi{1}(lTemp{:});
-                    F = F+w(q)*pagemtimes(phi,'none',double(value),'none');
+                    phi(:,:,1) = obj.phi{1}(lTemp{:});
+                    phi(:,:,2) = obj.phi{2}(lTemp{:});
+                    phi = phi(:,:,refTet);
+                    F = F+w(q)*pagemtimes(phi,'transpose',value,'none');
                 end
             else
                 for q=1:Nq
                     cnt = ones(size(l(:,q),1),1);
                     lTemp = mat2cell(l(:,q),cnt);
                     phi = obj.phi{1}(lTemp{:});
-                    F = F+w(q)*(phi'*value);
+                    F = F+w(q)*pagemtimes(phi,'transpose',value,'none');
                 end
             end
 
-            F = F*abs(detD);
+            F = pagemtimes(F,abs(detD));
 
             b = sparse(dofs',1,F(:),phys.DOFs.Nd,1);
         end
