@@ -1014,10 +1014,12 @@ classdef Geometry < handle
                     obj.Dk = [e12,e13,e14];
                     
                     obj.detD = dot(e12,cross(e13,e14,1),1);
+                    
+                    obj.DinvT = pagetranspose(pageinv(obj.Dk));
 
-                    obj.DinvT = [ cross(e13,e14,1) , ...
-                              cross(e14,e12,1) , ...
-                              cross(e12,e13,1) ]./obj.detD;
+                    % test = [ cross(e13,e14,1) , ...
+                    %           cross(e14,e12,1) , ...
+                    %           cross(e12,e13,1) ]./obj.detD;
 
                 case 'hex'
                     % hexahedron

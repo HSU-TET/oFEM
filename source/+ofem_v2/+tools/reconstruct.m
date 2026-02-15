@@ -33,7 +33,7 @@ function [X,U] = reconstruct(phys,u,order)
         phi(:,:,1) = phys.element.N{1}(lTemp{:});
         phi(:,:,2) = phys.element.N{2}(lTemp{:});
         phi = pagemtimes(DinvT,phi(:,:,phys.geometry.refTet));
-        U(:,:,q) = reshape(pagemtimes(pagemtimes(DinvT,phi),elu),dim,[]);
+        U(:,:,q) = reshape(pagemtimes(phi,elu),dim,[]);
     end
         
 end

@@ -425,17 +425,13 @@ classdef HCurlElement < ofem_v2.elements.Finite_Elements & handle
                     else
                         F = F+w(q)*pagemtimes(f,'transpose',phi,'none');
                     end
-                    %                 % accepts rhs data converted to integration points of the
-                    %                 % shape dim(f) dim(q) dim(el)
-                    %                     phi(:,:,1) = obj.curlN{1}(l(1,q),l(2,q),l(3,q));
-                    %                     phi(:,:,2) = obj.curlN{2}(l(1,q),l(2,q),l(3,q));
-                    %                     phi =  DinvT*ofem_v2.tools.matrixarray(phi(:,:,refTet));
-                    %                     F = F+w(q)*(f(:,q,:)'*phi);
                 end
             else
                 for q=1:Nq
-                    phi(:,:,1) = obj.N{1}(l(1,q),l(2,q),l(3,q));
-                    phi(:,:,2) = obj.N{2}(l(1,q),l(2,q),l(3,q));
+                    cnt = ones(size(l(:,q),1),1);
+                    lTemp = mat2cell(l(:,q),cnt);
+                    phi(:,:,1) = obj.N{1}(lTemp{:});
+                    phi(:,:,2) = obj.N{2}(lTemp{:});
                     phi =  pagemtimes(DinvT,phi(:,:,refTet));
                     F = F+w(q)*pagemtimes(f,'transpose',phi,'none');
                 end
