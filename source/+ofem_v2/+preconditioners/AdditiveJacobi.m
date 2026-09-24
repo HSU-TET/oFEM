@@ -7,6 +7,7 @@ classdef AdditiveJacobi <  handle
         G;                      % Discrete Gradient
         L;                      % Nodal Matrix
         nodalCorrect = 0;       % 0 or 1 if nodal solve should be used
+        useDecomp = 0;
     end
 
     methods
@@ -36,7 +37,12 @@ classdef AdditiveJacobi <  handle
             %   undefined
             obj.nodalCorrect = 1;
             obj.G = G(freeDOFs,amsdofs);
-            obj.L = decomposition(L(amsdofs,amsdofs),'lu');
+            if size(L,1)<1e5
+                obj.L = decomposition(L(amsdofs,amsdofs),'lu');
+                obj.useDecomp = 1;
+            else
+                obj.L = L(amsdofs,amsdofs);
+            end
         end
 
         function y = preconditioner(obj,r)
@@ -45,7 +51,11 @@ classdef AdditiveJacobi <  handle
             %r = r-A*y_edge;
 
             r_nodal = obj.G'*r;
-            e_nodal = obj.L\r_nodal;
+            if obj.useDecomp
+                e_nodal = obj.L\r_nodal;
+            else
+                e_nodal = cgs(obj.L,r_nodal,1e-6,500);
+            end
 
             y = y_edge + obj.G*e_nodal;
         end

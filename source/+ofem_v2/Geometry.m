@@ -113,6 +113,8 @@ classdef Geometry < handle
         % property as, e.g., DENSITY. parts{2,:} containg the indices
         % into mat.
         mat;
+        ed2el;
+        node2el;
         
 
     end
