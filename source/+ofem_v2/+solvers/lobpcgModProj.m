@@ -1,311 +1,195 @@
-function [X,l,Wn,lh] = lobpcgModProj(X,S,M,C,n,maxit,tol,Y,YMY,dofs)
-%MYLOBPCG Summary of this function goes here
-%   Detailed explanation goes here
-    
-	X = X(dofs,:);
+function [X,l,Wn,lh] = lobpcgModProj(X,S,M,~,n,maxit,tol,Y,YMY,dofs)
+%LOBPCGMODPROJ LOBPCG for S*x = lambda*M*x with the gradient space
+%projected out (Maxwell eigenvalue problems).
+%
+%   [X,l,Wn,lh] = lobpcgModProj(X,S,M,C,n,maxit,tol,Y,YMY,dofs)
+%
+%   X      initial block (all DOFs or only the free DOFs), m columns
+%   S, M   stiffness and mass matrix (all DOFs)
+%   C      unused, kept for compatibility. The preconditioner is (S+M)^-1.
+%   n      number of wanted eigenpairs (n <= m)
+%   maxit  maximum number of iterations
+%   tol    tolerance for the relative backward error
+%          ||S*x - lambda*M*x|| / ((||S|| + |lambda|*||M||)*||x||)
+%   Y      discrete gradients, columns must vanish on the non-free DOFs
+%   YMY    Y'*M*Y
+%   dofs   free DOFs
+%
+%   X      M-orthonormal Ritz vectors on the free DOFs (m columns)
+%   l      Ritz values as column vector (m entries)
+%   Wn     backward error per iteration and vector (maxit x m)
+%   lh     Ritz values per iteration (maxit x m)
+%
+%   Converged eigenpairs are soft locked in order: their residuals are
+%   no longer expanded, but the vectors stay in the Rayleigh-Ritz step.
+%   The search directions are M-orthogonalised against the gradients
+%   x <- x - Y*(Y'*M*Y)^-1*Y'*M*x.
 
-    MY = (Y'*M);
+    if size(X,1) ~= numel(dofs)
+        X = X(dofs,:);
+    end
+    m = size(X,2);
+    if n > m
+        error('lobpcgModProj:blockSize', ...
+            'Number of wanted eigenpairs (%d) exceeds the block size (%d).',n,m);
+    end
+
+    MY = Y'*M(:,dofs);
     M = M(dofs,dofs);
     S = S(dofs,dofs);
     Y = Y(dofs,:);
-    MY = MY(:,dofs);
 
-    %L = ilu(YMY,struct('udiag',1,'droptol',1e-4));
-    
     tau = 1e-14;
-    
-    J = 1:size(X,2);
-    I = ones(size(J));
-    
-    Wn = zeros(maxit,size(X,2));
-    lh = zeros(maxit,size(X,2));
-    ltest = zeros(maxit,size(X,2));
-    
-    %[L,U] = ilu(S+sigma*M);
-%     L1 = ichol(S+M);
-    %L2 = ichol(YMY);
-    dYMY = decomposition(YMY,'lu','CheckCondition',false);
-    dSM = decomposition(S+M,'lu','CheckCondition',false);
-    L2 = [];
-    q = 1;
-    idx = logical(ones(size(X,2),1));
-    useortho = 1;
-    
-    P = [];
-    
-    while norm(full(X'*M*X-speye(size(X,2))))/(norm(full(M*X))*norm(full(X))) > tau
-        X = svqb(M,X,10*eps);
-    end
-    
-    for j=1:1
-%         disp(vecnorm(MY'*X))
-        SX = zeros(size(YMY,1),size(X,2));
-        %W = W-X(:,1:q-1)*(X(:,1:q-1)'*M*W);
-%         for i = 1:size(X,2)
-%             %temp = zeros(totalD,1);
-%             temp = X(:,i);
-%             [SX(:,i),~] = bicgstab(YMY,MY*temp,1e-6,1000,L2,L2');
-%         end
-        SX = dYMY\(MY*X);
-        SX = Y*SX;
-%         SX = SX(dofs,:);
-%         SW = YMY\((MY')*W);
-        X = X - SX;
-    end
-    
+
+    Wn = zeros(maxit,m);
+    lh = zeros(maxit,m);
+
+    dYMY = spdFactor(YMY);
+    dSM = spdFactor(S+M);
+    project = @(U) U - Y*(dYMY\(MY*U));
+
+    % Norm estimates for the backward error
     NS = svds(S,1,'largest','SubspaceDimension',60,'Tolerance',1e-10);
     NM = svds(M,1,'largest','SubspaceDimension',60,'Tolerance',1e-10);
 
-    while norm(full(X'*M*X-speye(size(X,2))))/(norm(full(M*X))*norm(full(X))) > tau
-        X = svqb(M,X,10*eps);
-    end
+    % Initial block: project out gradients, M-orthonormalise, Rayleigh-Ritz
+    X = orthonormalize(M,X,10*eps,tau);
+    X = project(X);
+    X = orthonormalize(M,X,10*eps,tau);
+    [Z,l] = ritz(X'*S*X);
+    X = X*Z;
 
+    P = [];
+    q = 1;                 % first not yet converged eigenpair
+    active = true(1,m);    % columns whose residual is still expanded
+    converged = false;
 
-    m = size(X,2);
-    [Cx,~,l] = rayleighRitz(X,S,speye(size(S)),m,0);
-    X = X*Cx;
-    
-    SX = zeros(size(YMY,1),size(X,2));
-    
-%     for i = 1:size(X,2)
-%         %temp = zeros(totalD,1);
-%         temp = X(:,i);
-%         [SX(:,i),~] = bicgstab(YMY,MY*temp,1e-6,1000,L2,L2');
-%     end
-    SX = dYMY\(MY*X);
-    SX = Y*SX;
-    X = X - SX;
-
-    while norm(full(X'*M*X-speye(size(X,2))))/(norm(full(M*X))*norm(full(X))) > tau
-        X = svqb(M,X,tau);
-    end
-    
     for it = 1:maxit
-        % Compute residuals
-        
-        W = S*X-M*X*l;
-        ltest(it,:) = diag(X'*S*X);
-        lh(it,:) = diag(l);
-        % New convergence
-        Wn(it,:) = vecnorm(W)./((NS+abs(diag(l))'.*NM).*vecnorm(X));
-        I(Wn(it,:)<tol) = 0;
-        
-        
+        % Residuals and backward errors
+        W = S*X - (M*X).*l';
+        lh(it,:) = l;
+        Wn(it,:) = vecnorm(W)./((NS+abs(l').*NM).*vecnorm(X));
 
         % Soft locking in order
-        while Wn(it,q) < tol
-            idx(q) = 0;
-            disp(['Eig ',num2str(q),' converged at iteration ',num2str(it)]);
-            disp('removing from pool');
-            P(:,1) = [];
+        while q <= n && Wn(it,q) < tol
+            active(q) = false;
+            fprintf('Eig %d converged at iteration %d\n',q,it);
             q = q+1;
-            if q==n+1
-                break;
-            end
         end
-        
-        if q >= n+1
-            I = zeros(size(J));
-            X = X(:,~logical(I));
-            l = diag(l);
-            l = l(~logical(I));
-            disp('converged!')
+        if q > n
+            converged = true;
+            fprintf('All %d eigenpairs converged after %d iterations.\n',n,it);
             break;
         end
-        W = W(:,idx);
-        
-        while norm(full(X'*M*X-speye(size(X,2))))/(norm(full(M*X))*norm(full(X))) > tau
-            X = svqb(M,X,tau);
+
+        W = W(:,active);
+        if ~isempty(P)
+            P = P(:,active);
         end
-        if it>1
+
+        X = orthonormalize(M,X,tau,tau);
+        if ~isempty(P)
             P = orthoDrop(M,P,X,tau);
         end
-        
-%         for i = 1:size(W,2)
-%             [W(:,i),~] = pcg(S+1.8*M,W(:,i),1e-8,1000,L1,L1');
-%         end
-        W = dSM\W;
-        %W = (S+M)\W;
-%         
-        for j =1:1
-            SW = zeros(size(YMY,1),size(W,2));
-%             parfor i = 1:size(W,2)
-%                 %temp = zeros(totalD,1);
-%                 %[SW(:,i)] = gmres(YMY,MY*W(:,i),10,1e-4,1);
-%                 SW(:,i) = decomp\(MY*W(:,i));
-%             end
-            SW = dYMY\(MY*W);
-            SW = Y*SW;
-%             SW = SW(dofs,:);
-    %         SW = YMY\((MY')*W);
-            W = W - SW;
-        end
-        
-        W = orthoDrop(M,W,[X,P],tau);
-        
-        orthoOld = useortho;
-        [Cx,Cp,l,useortho] = rayleighRitzImproved([X,W,P],S,M,m,sum(idx),useortho);
-        
-        if useortho == orthoOld
-            l = l(1:m,1:m);
 
-            X = [X,W,P]*Cx;
-            %P = [X,W,P]*Cp;
-            P = [W,P]*Cx(m+1:end,:);
-            
-        else
-            l = diag(lh(it,:));
-            continue;
-        end
-        
-        if it == maxit
-            disp('maximum iterations reached!')
-            disp([num2str(sum(I)),' eigenvalues did not converge'])
-        end
+        % Precondition, project out gradients, orthogonalise against [X,P]
+        W = project(dSM\W);
+        W = orthoDrop(M,W,[X,P],tau);
+
+        % Rayleigh-Ritz on the M-orthonormal basis [X,W,P]
+        B = [X,W,P];
+        [Z,theta] = ritz(B'*S*B);
+        Cx = Z(:,1:m);
+        l = theta(1:m);
+        X = B*Cx;
+        P = B(:,m+1:end)*Cx(m+1:end,:);
+    end
+
+    if ~converged
+        warning('lobpcgModProj:maxit', ...
+            'Maximum iterations reached, %d of %d eigenpairs did not converge.', ...
+            n-q+1,n);
     end
 end
 
-function U = ortho(M,U,V,tau)
-    tau_r = 1e-10;
-    while norm(full(V'*M*U))/(norm(full(M*V))*norm(full(U))) > tau
-        if norm(full(V'*M*U))/(norm(full(M*V))*norm(full(U))) > tau
-            disp(norm(full(V'*M*U))/(norm(full(M*V))*norm(full(U))))
-        end
-        U = U-V*(V'*M*U);
-        while norm(full(U'*M*U-speye(size(U,2)))) > tau
-            U = svqb(M,U,tau_r);
-        end
+function d = spdFactor(A)
+    % Cholesky factorisation of a symmetric positive definite matrix,
+    % LU if it is not positive definite
+    A = (A+A')/2;
+    try
+        d = decomposition(A,'chol','CheckCondition',false);
+    catch
+        d = decomposition(A,'lu','CheckCondition',false);
     end
+end
+
+function [Z,theta] = ritz(G)
+    % Eigenpairs of the symmetric projected matrix, ascending
+    [Z,T] = eig((G+G')/2);
+    [theta,i] = sort(diag(T));
+    Z = Z(:,i);
+end
+
+% The orthogonalisation routines carry MU = M*U along, so M is applied
+% once per Gram-Schmidt pass, and compute 2-norms of tall matrices from
+% their small Gram matrices.
+
+function n = norm2(A)
+    n = sqrt(norm(A'*A));
+end
+
+function e = orthoError(U,MU)
+    e = norm(U'*MU-eye(size(U,2)))/(norm2(MU)*norm2(U));
+end
+
+function U = orthonormalize(M,U,tau_r,tau)
+    % Repeated SVQB until U'*M*U = I
+    MU = M*U;
+    for k = 1:10
+        if orthoError(U,MU) <= tau
+            return
+        end
+        [U,MU] = svqb(U,MU,tau_r,false);
+    end
+    warning('lobpcgModProj:ortho','M-orthonormalisation did not reach %g.',tau);
 end
 
 function U = orthoDrop(M,U,V,tau)
-    tau_r = 10*eps;
+    % M-orthogonalise U against V and M-orthonormalise U, dropping
+    % linearly dependent columns
     tau_drop = 10*eps;
-    
-    j = 0;
-    skip = 0;
-
-    n1 = V'*M;
-    n2 = norm(full(M*V));
-    
-    %while norm(full(V'*M*U))/(norm(full(M*V))*norm(full(U))) > tau
-    while norm(full(n1*U))/(n2*norm(full(U))) > tau
-		U = U-V*(V'*M*U);
-%         if norm(full(V'*M*U))/(norm(full(M*V))*norm(full(U))) > tau
-%             disp(norm(full(V'*M*U))/(norm(full(M*V))*norm(full(U))))
-%         end
-        while norm(full(U'*M*U-speye(size(U,2))))/(norm(full(M*U))*norm(full(U))) > tau
-            j = j+1;
-            if j==1 %|| j==2
-                [U,skip] = svqb(M,U,tau_r);
-            else
-                U = svqbDrop(M,U,tau_drop);
+    MV = M*V;
+    nMV = norm2(MV);
+    for k = 1:3
+        U = U-V*(MV'*U);
+        MU = M*U;
+        for j = 1:10
+            if isempty(U) || orthoError(U,MU) <= tau
+                break
             end
+            [U,MU] = svqb(U,MU,tau_drop,j > 1);
         end
-        if skip
-            break;
+        if isempty(U) || norm(MV'*U)/(nMV*norm2(U)) <= tau
+            return
         end
-        j = 0;
     end
 end
 
-function [U,skip] = svqb(M,U,tau_r)
-    D = diag(diag(U'*M*U))^(-1/2);
-    [Z,theta] = svd(D*U'*M*U*D);
-    theta = diag(theta);
-    J = (theta < tau_r*max(max(theta)));
-    theta(J) = tau_r*max(max(theta));
-    theta = diag(theta);
-    U = U*D*Z*theta^(-1/2);
-    if cond(theta)<4
-        skip = 1;
+function [U,MU] = svqb(U,MU,tau,drop)
+    % SVQB step. Small eigenvalues of the Gram matrix are either clamped
+    % to tau*max (drop = false) or their directions dropped (drop = true).
+    G = U'*MU;
+    D = diag(diag(G).^(-1/2));
+    G = D*G*D;
+    [Z,theta] = eig((G+G')/2,'vector');
+    if drop
+        J = theta >= tau*max(abs(theta));
+        Z = Z(:,J);
+        theta = theta(J);
     else
-        skip = 0;
+        theta = max(theta,tau*max(abs(theta)));
     end
+    T = D*Z*diag(theta.^(-1/2));
+    U = U*T;
+    MU = MU*T;
 end
-
-function U = svqbDrop(M,U,tau_drop)
-    D = diag(diag(U'*M*U))^(-1/2);
-    [Z,theta] = svd(D*U'*M*U*D);
-    J = ~(diag(theta) < tau_drop*max(max(theta)));
-    U = U*D*Z(:,J)*theta(J,J)^(-1/2);
-end
-    
-function [Cx,Cp,theta] = rayleighRitz(C,S,M,m,q)
-    D = diag(diag(C'*M*C))^(-1/2);
-    R = chol(D*C'*M*C*D);
-    [Z,theta] = svd(R'\D*C'*S*C*D/R);
-    [~,i] = sort(diag(theta));
-    theta = theta(i,i);
-    Z = Z(:,i);
-    Cx = D*R\Z(:,1:m);
-    Cp = [];
-    if q > 0
-        [Q,~] = qr(Z(1:m,m+1:m+q)');
-        Cp = D*R\Z(:,m+1:m+q)*Q';
-    end
-end
-
-function [Cx,Cp,theta,useOrtho] = rayleighRitzImproved(C,S,M,m,q,useOrtho)
-    if useOrtho
-        [Z,theta] = svd(C'*S*C);
-        [~,i] = sort(abs(diag(theta)));
-        theta = theta(i,i);
-        Z = Z(:,i);
-        Cx = Z(:,1:m);
-        %[Q,~] = qr(Z(1:m,m+1:m+q)');
-        %Cp = Z(:,m+1:m+q)*Q';
-        Cp = Z(m+1:end,1:m);
-        
-    else
-        D = diag(diag(C'*M*C))^(-1/2);
-        [R,f] = chol(D*C'*M*C*D);
-        if f==0
-            %[Z,theta] = svd(R'\D*C'*S*C*D/R);
-            [Z,theta] = eig(D*C'*S*C*D,D*C'*M*C*D);
-            [~,i] = sort(diag(theta));
-            theta = theta(i,i);
-            Z = Z(:,i);
-            Cx = (D*R)\Z(:,1:m);
-            [Q,L] = qr(Z(1:m,m+1:end)');
-            Cp = (D*R)\Z(:,m+1:end)*Q(1:m,:)';
-%             Cp = (D*R)\Z(:,m+1:m+q);
-%             Cp = Cp(m+1:end,:);
-        else
-            useOrtho = 1;
-            Cx = [];
-            Cp = [];
-            theta = [];
-        end
-    end
-    %theta = blkdiag(theta(1:m,1:m),Q(:,1:m-q)'*(theta(m+1:m+q,m+1:m+q))*Q(:,1:m-q));
-        
-end
-
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
