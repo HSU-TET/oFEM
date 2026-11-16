@@ -1,7 +1,7 @@
 close all;
 clear;
 
-nh = 10;
+nh = 3;
 no = 3;
 err = zeros(20,nh,no+1);
 
