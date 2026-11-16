@@ -127,6 +127,8 @@ classdef DirichletEdge < handle & ofem_v2.boundary.FixedBoundary
 					b = b + obj.value'*phi*ofem_v2.tools.matrixarray(1/A);
 
 				end
+				% sparse does not accept the matrixarray subclass
+				b = double(b);
 				obj.u = obj.u + sparse(fDofs(:),1,b(:),phys.DOFs.Nd,1);
 			end
 
