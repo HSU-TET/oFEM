@@ -113,7 +113,9 @@ function [w,l] = gaussSimplex(dim,order)
                     l = [perm4();
                          perm31(b);
                          perm22(c)]';
-                     w = [w1,repelem(w2,1,4),repelem(w3,1,6)];
+                     % Keast weights sum to 1/6; scaled to 1 like the other
+                     % rules because of the common w/6 below
+                     w = 6*[w1,repelem(w2,1,4),repelem(w3,1,6)];
                 case 5
                     w1 = 0.0302836781;
                     w2 = 0.00602678571;
@@ -138,7 +140,9 @@ function [w,l] = gaussSimplex(dim,order)
                          d([1,2,1]);
                          d([2,1,2]);
                          d([2,1,1])]';
-                     w = [w1,repelem(w2,1,4),repelem(w3,1,4),repelem(w4,1,6)];
+                     % Keast weights sum to 1/6; scaled to 1 like the other
+                     % rules because of the common w/6 below
+                     w = 6*[w1,repelem(w2,1,4),repelem(w3,1,4),repelem(w4,1,6)];
                 % From here on the quadrature is taken from phg
                 % lsec.cc.ac.cn/phg
                 case 6
