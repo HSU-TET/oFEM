@@ -35,6 +35,10 @@ classdef Physical_Problem < handle
         u;
         
         matlib;
+
+        % elements per call of the element assembly routines; the triplets
+        % and the working memory of sparse() exist only for one chunk
+        assemblyChunk = 1e6;
     end
     
     methods
@@ -92,13 +96,16 @@ classdef Physical_Problem < handle
             
             for i=1:Np
                 pIdx = obj.geometry.parts{3,i};
+                % with a single part S and SPart{1} share their memory
                 if obj.has_stiffness
-                    obj.SPart{i} = obj.element.assembleStiffness(obj,pIdx,obj.geometry.parts{2,i}.(obj.paraS));
-                    obj.S = obj.S + obj.SPart{i};
+                    obj.SPart{i} = obj.assembleChunked(@(p,m) obj.element.assembleStiffness(obj,p,m), ...
+                        pIdx,obj.geometry.parts{2,i}.(obj.paraS));
+                    if i == 1, obj.S = obj.SPart{i}; else, obj.S = obj.S + obj.SPart{i}; end
                 end
                 if obj.has_mass
-                    obj.MPart{i} = obj.element.assembleMass(obj,pIdx,obj.geometry.parts{2,i}.(obj.paraM));
-                    obj.M = obj.M+obj.MPart{i};
+                    obj.MPart{i} = obj.assembleChunked(@(p,m) obj.element.assembleMass(obj,p,m), ...
+                        pIdx,obj.geometry.parts{2,i}.(obj.paraM));
+                    if i == 1, obj.M = obj.MPart{i}; else, obj.M = obj.M + obj.MPart{i}; end
                 end
                 if has_f
                     if ~isempty(obj.geometry.parts{4,i})
@@ -124,10 +131,37 @@ classdef Physical_Problem < handle
 						end
                     end
                 end
-                obj.b = obj.b - (obj.S+obj.M+obj.D+obj.M_robin)*obj.u;
+                if any(obj.u)
+                    % lift the Dirichlet values (without forming S+M+D+M_robin)
+                    obj.b = obj.b - obj.S*obj.u - obj.M*obj.u - obj.D*obj.u - obj.M_robin*obj.u;
+                end
             end
         end
-        
+
+        function A = assembleChunked(obj,fun,pIdx,mat)
+            % A = fun(pIdx,mat) assembled in chunks of obj.assemblyChunk
+            % elements; per element materials (nc x nc x Ne) are split too.
+            % (Column blocks instead of sums are slower: the DOF numbering
+            % is not local, elements would be assembled ~2 times.)
+            n = numel(pIdx);
+            c = obj.assemblyChunk;
+            if n <= c
+                A = fun(pIdx,mat);
+                return
+            end
+            perElement = isnumeric(mat) && size(mat,3) == n;
+            A = [];
+            for s = 1:c:n
+                k = s:min(s+c-1,n);
+                if perElement
+                    Ak = fun(pIdx(k),mat(:,:,k));
+                else
+                    Ak = fun(pIdx(k),mat);
+                end
+                if isempty(A), A = Ak; else, A = A + Ak; end
+            end
+        end
+
         function attachDOFHandler(obj,DOFHandler)
             obj.DOFs = DOFHandler;
 		end
