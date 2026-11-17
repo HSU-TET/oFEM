@@ -40,6 +40,7 @@ Cubit/Trelis (`.inp`, loaded with `load_from_inp`).
 | [HCurl/QuasiStatic/FerriteCoil](HCurl/QuasiStatic/FerriteCoil) | quasi-static | stationary current in a coil (H1), then the time-harmonic eddy current problem `S + i*omega*M` for the vector potential |
 | [HCurl/QuasiStatic/Coil](HCurl/QuasiStatic/Coil) | quasi-static | the same workflow for an air coil — **incomplete**: the eddy current part uses `v_potential`/`dofsNe`, which are not set up in the script |
 | [HCurl/QuasiStatic/AirCoil](HCurl/QuasiStatic/AirCoil) | quasi-static | geometry only (`aircoil.geo`, `.brep`) |
+| [HCurl/QuasiStatic/EddyCurrentPreconditioners](HCurl/QuasiStatic/EddyCurrentPreconditioners) | quasi-static | iterative solvers for H(curl) systems: `eddyCurrentSweep.m` solves the eddy currents in a copper wire over a frequency sweep with BiCGStab and the `AdditiveJacobi` (sweep mode) and `HiptmairXu` preconditioners; `preconditionerScaling.m` compares the iteration counts under mesh refinement |
 | [HCurl/FullWave/MaxwellEigenvalue2D](HCurl/FullWave/MaxwellEigenvalue2D) | full wave | eigenvalues of a 2D PEC resonator, convergence study (`runConvergence.m`) |
 | [HCurl/FullWave/RectangularCavity](HCurl/FullWave/RectangularCavity) | full wave | eigenvalues of a 3D cavity resonator, live script `rect.mlx` |
 | [HCurl/FullWave/RectangularCavityConvergence](HCurl/FullWave/RectangularCavityConvergence) | full wave | convergence of the 3D cavity eigenvalues in mesh size and order (`runConvergence.m`) |
