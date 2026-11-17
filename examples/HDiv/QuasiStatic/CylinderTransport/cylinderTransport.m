@@ -1,6 +1,6 @@
 %% Pulsating flow past an off-center cylinder with tracer transport
 %
-% 1) Velocity: potential (Darcy) flow as in cylinderFlow.m,
+% 1) Velocity: potential (Darcy) flow as in ../../Static/CylinderFlow,
 %
 %       u + grad p = f(t),  div u = 0,  u.n = 0 on walls and cylinder,
 %       p = 0 at inlet and outlet,
