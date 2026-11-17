@@ -74,13 +74,19 @@ classdef HDivElement < ofem_v2.elements.Finite_Elements & handle
             % int mat * div(u) * div(v)
             [w,l] = ofem_v2.tools.gaussSimplex(obj.dim,obj.degreeStiff);
             [refTet,dofs,detD,~,X] = obj.elementData(phys,pIdx,l);
-            Ns = obj.DOFsPerElement;
-            S = zeros(Ns,Ns,numel(pIdx));
-            for q = 1:size(w,1)
-                dphi = obj.evalRef(obj.divN,l(:,q),refTet);
-                S = S + w(q)*pagemtimes(dphi,'transpose',materialTimes(mat,X,q,dphi),'none');
+            if isa(mat,'function_handle')
+                Ns = obj.DOFsPerElement;
+                S = zeros(Ns,Ns,numel(pIdx));
+                for q = 1:size(w,1)
+                    dphi = obj.evalRef(obj.divN,l(:,q),refTet);
+                    S = S + w(q)*pagemtimes(dphi,'transpose',materialTimes(mat,X,q,dphi),'none');
+                end
+                S = S./abs(detD);
+            else
+                % constant material: reference tensors
+                S = ofem_v2.tools.refTensorMatrices(obj.divN,w,l,refTet, ...
+                    ofem_v2.tools.geometryFactor([],mat,1./abs(detD)));
             end
-            S = S./abs(detD);
             S = obj.toSparse(phys,dofs,S);
         end
 
@@ -88,13 +94,19 @@ classdef HDivElement < ofem_v2.elements.Finite_Elements & handle
             % int u' * mat * v
             [w,l] = ofem_v2.tools.gaussSimplex(obj.dim,obj.degreeMass);
             [refTet,dofs,detD,Dk,X] = obj.elementData(phys,pIdx,l);
-            Ns = obj.DOFsPerElement;
-            M = zeros(Ns,Ns,numel(pIdx));
-            for q = 1:size(w,1)
-                phi = pagemtimes(Dk,obj.evalRef(obj.N,l(:,q),refTet));
-                M = M + w(q)*pagemtimes(phi,'transpose',materialTimes(mat,X,q,phi),'none');
+            if isa(mat,'function_handle')
+                Ns = obj.DOFsPerElement;
+                M = zeros(Ns,Ns,numel(pIdx));
+                for q = 1:size(w,1)
+                    phi = pagemtimes(Dk,obj.evalRef(obj.N,l(:,q),refTet));
+                    M = M + w(q)*pagemtimes(phi,'transpose',materialTimes(mat,X,q,phi),'none');
+                end
+                M = M./abs(detD);
+            else
+                % constant material: reference tensors
+                M = ofem_v2.tools.refTensorMatrices(obj.N,w,l,refTet, ...
+                    ofem_v2.tools.geometryFactor(Dk,mat,1./abs(detD)));
             end
-            M = M./abs(detD);
             M = obj.toSparse(phys,dofs,M);
         end
 
