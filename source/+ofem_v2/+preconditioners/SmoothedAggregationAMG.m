@@ -13,13 +13,21 @@ classdef SmoothedAggregationAMG < handle
     %   Gauss-Seidel sweep before and a backward sweep after the coarse
     %   correction, so it is a symmetric preconditioner (for PCG). The
     %   coarsest level is solved with a Cholesky factorisation.
+    %
+    %   Memory: only the lower triangle L = tril(A_k) and the diagonal of
+    %   each level are stored. A_k*x = L*x + L'*x - d.*x, the backward
+    %   sweep solves with L' (no copy of the transpose is formed).
 
     properties
-        levels;                 % struct array: A, P, L, U
+        levels;                 % struct array: L = tril(A_k), d = diag(A_k), P
         coarse;                 % factorisation on the coarsest level
         theta = 0.08;
         maxCoarse = 2000;
         maxLevels = 15;
+    end
+
+    properties (Access = private)
+        nnzLevels;              % nnz(A_k) of all levels incl. the coarsest
     end
 
     methods
@@ -34,12 +42,9 @@ classdef SmoothedAggregationAMG < handle
             obj.maxLevels = ip.Results.MaxLevels;
 
             A = (A+A')/2;
-            lv = struct('A',{},'P',{},'L',{},'U',{});
+            lv = struct('L',{},'d',{},'P',{});
             for k = 1:obj.maxLevels
                 n = size(A,1);
-                lv(k).A = A;
-                lv(k).L = tril(A);
-                lv(k).U = triu(A);
                 if n <= obj.maxCoarse || k == obj.maxLevels
                     break
                 end
@@ -48,23 +53,25 @@ classdef SmoothedAggregationAMG < handle
                 if nc >= n || nc == 0
                     break                       % no coarsening possible
                 end
+                lv(k).L = tril(A);
+                d = full(diag(A));
+                lv(k).d = d;
                 % tentative prolongation: normalised indicator of aggregates
                 cnt = accumarray(agg,1);
                 T = sparse((1:n)',agg,1./sqrt(cnt(agg)),n,nc);
                 % smoothing with damped Jacobi, omega = 4/(3 rho(D^-1 A))
-                d = full(diag(A));
                 omega = 4/(3*spectralRadius(A,d));
                 P = T - omega*(spdiags(1./d,0,n,n)*(A*T));
                 lv(k).P = P;
                 A = P'*A*P;
                 A = (A+A')/2;
             end
-            obj.levels = lv;
-            Ac = lv(end).A;
+            obj.levels = lv;                % coarsest level: only the factorisation
+            obj.nnzLevels = [arrayfun(@(l) 2*nnz(l.L)-numel(l.d),lv), nnz(A)];
             try
-                obj.coarse = decomposition(Ac,'chol','CheckCondition',false);
+                obj.coarse = decomposition(A,'chol','CheckCondition',false);
             catch
-                obj.coarse = decomposition(Ac,'lu','CheckCondition',false);
+                obj.coarse = decomposition(A,'lu','CheckCondition',false);
             end
         end
 
@@ -74,20 +81,20 @@ classdef SmoothedAggregationAMG < handle
 
         function c = complexity(obj)
             % operator complexity sum(nnz(A_k))/nnz(A_1)
-            c = sum(arrayfun(@(l) nnz(l.A),obj.levels))/nnz(obj.levels(1).A);
+            c = sum(obj.nnzLevels)/obj.nnzLevels(1);
         end
     end
 
     methods (Access = private)
         function x = vcycle(obj,k,b)
-            lv = obj.levels(k);
-            if k == numel(obj.levels)
+            if k > numel(obj.levels)
                 x = obj.coarse\b;
                 return
             end
+            lv = obj.levels(k);
             x = lv.L\b;                                 % forward Gauss-Seidel
-            x = x + lv.P*obj.vcycle(k+1,lv.P'*(b-lv.A*x));
-            x = x + lv.U\(b-lv.A*x);                    % backward Gauss-Seidel
+            x = x + lv.P*obj.vcycle(k+1,lv.P'*(b-symMul(lv.L,lv.d,x)));
+            x = x + lv.L'\(b-symMul(lv.L,lv.d,x));      % backward Gauss-Seidel
         end
     end
 end
@@ -147,4 +154,9 @@ function rho = spectralRadius(A,d)
         rho = norm(y)/norm(x);
         x = y/norm(y);
     end
+end
+
+function y = symMul(L,d,x)
+    % A*x for symmetric A with L = tril(A), d = diag(A)
+    y = L*x + L'*x - d.*x;
 end

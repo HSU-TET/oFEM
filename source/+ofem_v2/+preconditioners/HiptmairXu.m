@@ -26,12 +26,14 @@ classdef HiptmairXu < handle
     %                         smooth, G, Pi, G, smooth) or 'additive'
     %            'AuxSolver'  'amg' (default), 'chol', 'ict'
     %
+    %   Memory: only L = tril(A) and diag(A) of the system matrix are kept
+    %   (A*x = L*x + L'*x - d.*x), the AMG hierarchies do the same.
+    %
     %   A has to be real symmetric positive definite. For complex problems
     %   like A = S + 1i*omega*M use the preconditioner of S + omega*M, it can
     %   be applied to complex residuals (e.g. with bicgstab or gmres).
 
     properties
-        A;              % system matrix (free DOFs)
         G;              % discrete gradient (free DOFs x nodes)
         Pi;             % cell array of interpolation blocks
         cycle = 'multiplicative';
@@ -41,7 +43,7 @@ classdef HiptmairXu < handle
     properties (Access = private)
         BG;             % solver for G'AG
         BPi;            % solvers for Pi_d' A Pi_d
-        L; U; Dg;       % Gauss-Seidel factors and diagonal of A
+        L; Dg;          % tril(A) and diag(A) (free DOFs)
     end
 
     methods
@@ -58,29 +60,31 @@ classdef HiptmairXu < handle
             end
             if ~iscell(Pi), Pi = {Pi}; end
 
-            obj.A = (A+A')/2;
+            if ~issymmetric(A)
+                A = (A+A')/2;
+            end
             obj.G = dropZeroColumns(G);
             obj.Pi = cellfun(@dropZeroColumns,Pi,'UniformOutput',false);
-            obj.L = tril(obj.A);
-            obj.U = triu(obj.A);
-            obj.Dg = full(diag(obj.A));
+            obj.L = tril(A);
+            obj.Dg = full(diag(A));
 
-            obj.BG = obj.auxiliary(obj.G);
-            obj.BPi = cellfun(@(P) obj.auxiliary(P),obj.Pi,'UniformOutput',false);
+            obj.BG = obj.auxiliary(A,obj.G);
+            obj.BPi = cellfun(@(P) obj.auxiliary(A,P),obj.Pi,'UniformOutput',false);
         end
 
         function x = apply(obj,r)
-            A = obj.A;
+            L = obj.L;
+            Ax = @(x) L*x + L'*x - obj.Dg.*x;
             switch obj.cycle
                 case 'multiplicative'
-                    x = obj.L\r;                                    % forward GS
-                    x = x + obj.correctG(r - A*x);
-                    x = x + obj.correctPi(r - A*x);
-                    x = x + obj.correctG(r - A*x);
-                    x = x + obj.U\(r - A*x);                        % backward GS
+                    x = L\r;                                        % forward GS
+                    x = x + obj.correctG(r - Ax(x));
+                    x = x + obj.correctPi(r - Ax(x));
+                    x = x + obj.correctG(r - Ax(x));
+                    x = x + L'\(r - Ax(x));                         % backward GS
                 case 'additive'
                     % symmetric Gauss-Seidel + both corrections
-                    x = obj.U\(obj.Dg.*(obj.L\r));
+                    x = L'\(obj.Dg.*(L\r));
                     x = x + obj.correctG(r) + obj.correctPi(r);
             end
         end
@@ -134,8 +138,8 @@ classdef HiptmairXu < handle
     end
 
     methods (Access = private)
-        function B = auxiliary(obj,P)
-            Ap = P'*obj.A*P;
+        function B = auxiliary(obj,A,P)
+            Ap = P'*(A*P);
             Ap = (Ap+Ap')/2;
             switch obj.auxSolver
                 case 'amg'
