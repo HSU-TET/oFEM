@@ -58,15 +58,15 @@ classdef H1Element < ofem_v2.elements.Finite_Elements & handle
                     phi = simplify(phi);
                     obj.DOFsPerElement = size(phi,2);
 
-                    dPhi = sym(zeros(2,size(phi,2)));
+                    dPhi = sym(zeros(1,size(phi,2)));
                     for i = 1:size(phi,2)
                         dPhi(:,i) = gradient(phi(i),dr);
                     end
 
                     phiFunc{1} = matlabFunction(phi,'vars',[u]);
-                    phiFunc{2} = matlabFunction(phi,'vars',[u]);
+                    phiFunc{2} = phiFunc{1};
                     dPhiFunc{1} = matlabFunction(dPhi,'vars',[u]);
-                    dPhiFunc{1} = matlabFunction(dPhi,'vars',[u]);
+                    dPhiFunc{2} = dPhiFunc{1};
                     obj.nodeDOFs = 1;
                     obj.edgeDOFs = obj.degree-1;
 
@@ -94,7 +94,7 @@ classdef H1Element < ofem_v2.elements.Finite_Elements & handle
                     end
 
                     for i = 0:obj.degree-3
-                        for j = 0:obj.degree-3
+                        for j = 0:obj.degree-3-i
                             p = subs(leg.legIntS(i+2),[x,t],[N(2)-N(1),N(1)+N(2)]);
                             q = N(3)*subs(leg.leg(j+1),2*N(3)-1);
                             I = [I,p*q];

@@ -23,8 +23,9 @@ classdef LegPoly < handle
 			obj.legIntS = [x,(x^2-t^2)/2];
             obj.legIntNB = [-0.5*c,-0.5*x*c];
 			for n = 1:order
-				obj.leg(n+2) = ((2*n+3)*obj.leg(n+1)*x-(n+1)*obj.leg(n))/(n+2);
-				obj.legS(n+2) = ((2*n+3)*x*obj.legS(n+1)-(n+1)*t^2*obj.legS(n))/(n+2);
+				% Bonnet: (n+1)*P_{n+1} = (2n+1)*x*P_n - n*P_{n-1}
+				obj.leg(n+2) = ((2*n+1)*x*obj.leg(n+1)-n*obj.leg(n))/(n+1);
+				obj.legS(n+2) = ((2*n+1)*x*obj.legS(n+1)-n*t^2*obj.legS(n))/(n+1);
             end
             for n = 2:order
 				obj.legInt(n+1) = ((2*n-1)*x*obj.legInt(n)-(n-2)*obj.legInt(n-1))/(n+1);
