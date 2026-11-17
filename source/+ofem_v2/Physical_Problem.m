@@ -344,18 +344,53 @@ classdef Physical_Problem < handle
         end
         
         function parabolic_solve(obj, init, timesteps, deltaTime,folder,file)
-            
-            %           Passt das so ?berhaupt?!
-            dofs = obj.DOFs.freeDOFs;
-            obj.u(dofs)= init.value;
-            dt= deltaTime;
-            n = timesteps;
-			obj.geometry.export_UCD([pwd, folder],[file,num2str(0)], {'T', obj.u, ''});
-            for i = 1:n
-                b2 = obj.b+obj.M/dt*obj.u;
-                obj.u(dofs) = (obj.S(dofs,dofs)+obj.M(dofs,dofs)/dt+obj.M_robin(dofs,dofs))\b2(dofs); % change something
-                
-                obj.geometry.export_UCD([pwd, folder],[file,num2str(i)], {'T', obj.u, ''});
+            % Implicit Euler for M du/dt + (S + M_robin) u = b with the
+            % (time independent) Dirichlet values set by assemble.
+            %
+            % init.value: a constant initial value (for H1 elements only
+            % the vertex DOFs are set, which represents the constant
+            % exactly in the hierarchical basis) or a full DOF vector.
+            % Exports u after every step to [pwd,folder]/[file,i].
+            free = obj.DOFs.freeDOFs;
+            dt = deltaTime;
+
+            % Dirichlet values and right hand side without the lifting
+            % -(S+M+D+M_robin)*uD that assemble subtracted
+            uD = obj.u;
+            uD(free) = 0;
+            K = obj.S+obj.M+obj.D+obj.M_robin;
+            bNat = obj.b + K*uD;
+
+            % initial value
+            u = uD;
+            if isscalar(init.value)
+                if ~isempty(obj.DOFs.n2DOF)
+                    vertex = false(size(u));
+                    vertex(obj.DOFs.n2DOF(:)) = true;
+                    isFree = false(size(u));
+                    isFree(free) = true;
+                    u(vertex & isFree) = init.value;
+                else
+                    u(free) = init.value;
+                end
+            else
+                u(free) = init.value(free);
+            end
+            obj.u = u;
+
+            A = obj.S + obj.M/dt + obj.M_robin;
+            Aff = A(free,free);
+            try
+                dA = decomposition((Aff+Aff')/2,'chol');
+            catch
+                dA = decomposition(Aff,'lu');
+            end
+            obj.geometry.export_UCD([pwd, folder],[file,num2str(0)], {'T', full(obj.u), ''});
+            for i = 1:timesteps
+                rhs = bNat + obj.M/dt*obj.u - A*uD;
+                obj.u = uD;
+                obj.u(free) = dA\rhs(free);
+                obj.geometry.export_UCD([pwd, folder],[file,num2str(i)], {'T', full(obj.u), ''});
             end
         end
         
