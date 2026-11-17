@@ -1,98 +1,119 @@
 %% Taser Test Geo
-% by Leonard Spiering 07.12.2019 
-% 20microsec puls -> frequency of 50kHz 
+% by Leonard Spiering 07.12.2019
+% 20microsec puls -> frequency of 50kHz
 % PeakVoltage of 500kV
 % Material Parameter: dry Skin (thickness?!)
-%                       Nerves completely ignored. 
+%                       Nerves completely ignored.
 %https://itis.swiss/virtual-population/tissue-properties/database/dielectric-properties/
+%
+% Electro-quasistatic potential in a 3D leg between two ring electrodes
+% (UpperCircle, LowerCircle):
+%   div((kappa + epsilon d/dt) grad phi) = 0.
+% First the purely resistive (kappa) and purely capacitive (epsilon)
+% stationary potentials for PotentialLeft/PotentialRight, then the time
+% stepping with the upper electrode driven by pulse(t) and the lower one
+% grounded. (The original loop set both electrodes to pulse(t), which
+% gives a constant potential.)
 close all;
-clear all; 
+clear;
 
 %% Defining Variables
-PotentialLeft = 0; %[V]
-PotentialRight = 5000; %[V]
+PotentialLeft = 0;     %[V] UpperCircle
+PotentialRight = 5000; %[V] LowerCircle
+dt = 0.001;            %[s]
+n = 100;               % time steps
 
 %% Importing the Geometry
-fileLeg = [pwd,'\geometry\leg3D']; 
-
-mesh = Geometry(); 
-mesh.load_from_msh(fileLeg);
+file = fullfile('geometry','leg3D');
+if ~isfile([file,'.msh'])
+    system(sprintf('gmsh "%s.geo" -3 -v 0 -o "%s.msh"',file,file));
+end
+mesh = ofem_v2.Geometry();
+mesh.load_from_msh(file);
+mesh.create_edges;
+mesh.create_faces;
+mesh.connectFa2Ed;
 
 %% Choose function Space
-element = P1Element(mesh); 
+element = ofem_v2.elements.loadFE('H1_3D_Order_1');
+dofs = ofem_v2.DOFHandler(mesh);
+dofs.attach(element);
 
-%% Setting up the Model Problem 
-% electro quasi steady:
-Voltkappa = Physical_Problem(element, mesh, 1,0,0);
-Voltepsilon = Physical_Problem(element, mesh, 1,0,0);
-%% Boundary Condition
-leftElectrode = DirichletBC(PotentialLeft, 'UpperCircle', mesh); 
-rightElectrode = DirichletBC(PotentialRight, 'LowerCircle', mesh); 
-
-Voltkappa.setBoundaryCondition(leftElectrode);
-Voltkappa.setBoundaryCondition(rightElectrode);
-Voltepsilon.setBoundaryCondition(leftElectrode);
-Voltepsilon.setBoundaryCondition(rightElectrode);
 %% Setting up the Material
-
-e0 = 8.8541878176E-12;
-blood = Material();
+e0 = ofem_v2.materials.Material.eps0;
+blood = ofem_v2.materials.Material();
 blood.epsilon = 5.20E+3*e0;
-blood.kappa = 7.01E-1; 
+blood.kappa = 7.01E-1;
 
-muscle = Material(); 
-muscle.epsilon =1.01E+4*e0; 
-muscle.kappa = 3.52E-1; 
+muscle = ofem_v2.materials.Material();
+muscle.epsilon = 1.01E+4*e0;
+muscle.kappa = 3.52E-1;
 
-bone = Material(); % Parameter of Cortical bone
-bone.epsilon =2.64E+2*e0;
-bone.kappa =2.06E-2; 
+bone = ofem_v2.materials.Material(); % Parameter of Cortical bone
+bone.epsilon = 2.64E+2*e0;
+bone.kappa = 2.06E-2;
 
-skin = Material(); 
-skin.epsilon = 1.13E+3*e0; 
-skin.kappa =2.73E-4; 
+skin = ofem_v2.materials.Material();
+skin.epsilon = 1.13E+3*e0;
+skin.kappa = 2.73E-4;
 
-fat = Material();
-fat.epsilon =1.63E+2*e0; 
-fat.kappa =4.33E-2; 
+fat = ofem_v2.materials.Material();
+fat.epsilon = 1.63E+2*e0;
+fat.kappa = 4.33E-2;
 
-dt = 0.001; 
-Voltkappa.chooseParameter('Blood', blood.kappa, 'stiffness');
-Voltkappa.chooseParameter('Skin', skin.kappa, 'stiffness');
-Voltkappa.chooseParameter('Muscle', muscle.kappa, 'stiffness');
-Voltkappa.chooseParameter('Bone', bone.kappa, 'stiffness');
-Voltkappa.chooseParameter('Fat', fat.kappa, 'stiffness');
+mesh.setMaterial('Blood',blood);
+mesh.setMaterial('Skin',skin);
+mesh.setMaterial('Muscle',muscle);
+mesh.setMaterial('Bone',bone);
+mesh.setMaterial('Fat',fat);
 
-Voltepsilon.chooseParameter('Blood', blood.epsilon/dt, 'stiffness');
-Voltepsilon.chooseParameter('Skin', skin.epsilon/dt, 'stiffness');
-Voltepsilon.chooseParameter('Muscle', muscle.epsilon/dt, 'stiffness');
-Voltepsilon.chooseParameter('Bone', bone.epsilon/dt, 'stiffness');
-Voltepsilon.chooseParameter('Fat', fat.epsilon/dt, 'stiffness');
+%% Setting up the Model Problem and Boundary Condition
+leg = ofem_v2.Physical_Problem(element, mesh, 1,0,0);
+leg.attachDOFHandler(dofs);
+upper = ofem_v2.boundary.Dirichlet(PotentialLeft, 'UpperCircle', mesh);
+lower = ofem_v2.boundary.Dirichlet(PotentialRight, 'LowerCircle', mesh);
+leg.setBoundaryCondition(upper);
+leg.setBoundaryCondition(lower);
+dofs.generateDOFs;
 
-%% Assembly of the matrices
-Voltkappa.assemble(); 
-Voltepsilon.assemble();
+%% Assembly and stationary solutions
+leg.setParaS('kappa');
+leg.assemble(1);
+Sk = leg.S;
+leg.solve();
+uKappa = leg.u;            % purely resistive
 
-Voltkappa.solve(); 
-Voltepsilon.solve(); 
+leg.setParaS('epsilon');
+leg.assemble(1);
+Se = leg.S;
+leg.solve();
+uEpsilon = leg.u;          % purely capacitive
 
-%% Test- Solving as Elliptic Problem
-u_init= Initial_Condition(0);
-u_i = zeros(mesh.Nco,1);
-u_i(Voltkappa.dof) = u_init.value;  %Maximum variable size allowed by the program is exceeded.
-n = 100;
+exportDir = fullfile(pwd,'exportLeg');
+exportStatic(mesh,exportDir,uKappa,uEpsilon);
 
-A = Voltkappa.S + Voltepsilon.S/dt;
-L = ichol(A(Voltkappa.dof,Voltkappa.dof));
+%% Time stepping
+iUpper = dofs.n2DOF(upper.nodes);
+iLower = dofs.n2DOF(lower.nodes);
+uD = zeros(dofs.Nd,1);
+uD(iLower) = 0;
+dirichlet = @(t) setValues(uD,iUpper,pulse(t));
 
-for i =1:n+1
-    u_imin1 = u_i;
-    b_diri = ones(mesh.Nco,1)*pulse(i*dt); % sind das wirklich die dirichlet werte?!
-	b_diri(Voltkappa.dof) = 0;
-	b_diri = A*b_diri;
-    b = -b_diri+Voltepsilon.S/dt * u_imin1;  % ./ !?
-    u_i(Voltepsilon.dof) = cgs(A(Voltepsilon.dof,Voltepsilon.dof),b(Voltepsilon.dof),1e-7,1000,L,L');
-    
-	mesh.export_UCD([pwd, '/exportLeg'],['exportLeg3D',num2str(i-1)], {'u', u_i, ''});
-    
+export = @(i,t,u) exportPotential(mesh,exportDir,'exportLeg3D',i,u);
+u = dirichlet(0);
+export(0,0,u);
+u = eqsTimeStepping(Sk,Se,dofs.freeDOFs,dirichlet,u,dt,n,export);
+fprintf('TaserTestGeo: %d steps, potential range at the end [%.3g, %.3g] V\n',n,min(u),max(u));
+
+function u = setValues(u,idx,value)
+    u(idx) = value;
+end
+
+function exportPotential(mesh,folder,name,i,u) %#ok<INUSD> used inside evalc
+    evalc('mesh.export_UCD(folder,[name,num2str(i)],{''u'',u,''''})');
+end
+
+function exportStatic(mesh,folder,uKappa,uEpsilon) %#ok<INUSD> used inside evalc
+    evalc(['mesh.export_UCD(folder,''staticLeg3D'',{''uKappa'',full(uKappa),''V''},' ...
+        '{''uEpsilon'',full(uEpsilon),''V''})']);
 end

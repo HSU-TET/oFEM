@@ -1,77 +1,53 @@
-
-close all; 
-clear all; 
+%% Poisson problem with Dirichlet and Neumann data and a volume force
+% -div(rho grad u) = f in the planar capacitor geometry with
+%   u = 10            on the left plate   (Dirichlet)
+%   rho du/dn = 30    on the right plate  (Neumann)
+%   f = 9             in both regions     (volume force)
+% and rho = 2 in the paper, rho = 100 in the glass region. (Ported from the
+% first oFEM version, where the same setup was used on a wire mesh.)
+close all;
+clear;
 
 %% Setting up the Geometry class
-file = 'planarCapacitor';  % 2D mesh from exercise 1
-% load file
-mesh= Geometry(); 
+file = 'planarCapacitor';
+if ~isfile([file,'.msh'])
+    system(sprintf('gmsh %s.geo -2 -v 0 -o %s.msh',file,file));
+end
+mesh = ofem_v2.Geometry();
 mesh.load_from_msh(file);
-% Setting up Partname and BD names
-mesh.parts{1,1}= 'Wire';
-mesh.parts{1,2}= 'Surrounding';
-mesh.bd{1,1}= 'BD:1';
-mesh.bd{1,2}= 'BD:2';
+mesh.create_edges;
 
 %% Choosing the function Space
-
-%creating object of P1Element class
-element = P1Element(mesh);
-
+element = ofem_v2.elements.loadFE('H1_2D_Order_1');
+dofs = ofem_v2.DOFHandler(mesh);
+dofs.attach(element);
 
 %% Creating Material Classes
-
-%create matetial class
-air = Material(); 
-cupper =Material();
-%assign values to the properties
-air.rho = 2; 
-air.kappa = 4; 
-air.my = 7;
-cupper.rho = 100; 
-cupper.kappa = 400; 
-cupper.my= 700;
+surrounding = ofem_v2.materials.Material();
+surrounding.rho = 2;
+wire = ofem_v2.materials.Material();
+wire.rho = 100;
+mesh.setMaterial('Paper', surrounding);
+mesh.setMaterial('Glas', wire);
 
 %% Modeling the Physical Problem
+problem = ofem_v2.Physical_Problem(element, mesh, 1,0,0);
+problem.attachDOFHandler(dofs);
+problem.setParaS('rho');
 
-%creating class with functionspace, mesh and specify matrices
-Cap2d = Physical_Problem(element, mesh, 1,0,0); 
-% assign material to the parts
-air.setMaterial(Cap2d, 'Surrounding');
-cupper.setMaterial(Cap2d, 'Wire');
+%% Boundary conditions and volume force
+feBd = ofem_v2.elements.loadFE('H1_1D_Order_1');
+dirichlet = ofem_v2.boundary.Dirichlet(10, 'LeftPlate', mesh);
+neumann = ofem_v2.boundary.Neumann(30, feBd, 'RightPlate', mesh);
+problem.setBoundaryCondition(dirichlet);
+problem.setBoundaryCondition(neumann);
+ofem_v2.Volume_force(9, 'Paper', mesh);
+ofem_v2.Volume_force(9, 'Glas', mesh);
 
-%choose which Materialparameter is needed for which Matrix
-Cap2d.chooseParameter('Surrounding',air.rho, 'stiffness');
-Cap2d.chooseParameter('Surrounding',air.kappa, 'mass');
-Cap2d.chooseParameter('Surrounding',air.my, 'damping');
-
-Cap2d.chooseParameter('Wire',cupper.rho, 'stiffness');
-Cap2d.chooseParameter('Wire',cupper.kappa, 'mass');
-Cap2d.chooseParameter('Wire',cupper.my, 'damping');
-%% Creating BC
-
-dirichlet_1 = DirichletBC(10, 'BD:1', mesh);
-neumann_1 = NeumannBC(30, 'BD:2', mesh);
-%dirichlet_2 = DirichletBC(15, 'BD:2', mesh);
-
-%% Setting Volume Force and BC
-Cap2d.volume_force= Volume_force(9, [1,1,2,3,4,5]); 
-
-Cap2d.setBoundaryCondition(dirichlet_1);
-Cap2d.setBoundaryCondition(neumann_1);
-
-%% Assembly of the matrices
-
-Cap2d.assemble(); 
-
-%% Solving the System
-Cap2d.solve(); 
+%% Assembly and solution
+dofs.generateDOFs;
+problem.assemble();
+problem.solve();
 
 %% Exporting the Data
-mesh.export_UCD([pwd,'/export'],['export'],{'U',Cap2d.u,''});
-
-
-
-
-
-
+mesh.export_UCD([pwd,'/export'],'export',{'U',problem.u,''});

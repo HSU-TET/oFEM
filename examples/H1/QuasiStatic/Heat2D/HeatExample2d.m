@@ -6,8 +6,10 @@ close all;
 clear all; 
 
 %% Creating the geometry
-file = '.\geometry\HeatExample2d';
-%file = 'HeatExample2D';
+file = fullfile('geometry','HeatExample2d');
+if ~isfile([file,'.msh'])
+    system(sprintf('gmsh "%s.geo" -2 -v 0 -o "%s.msh"',file,file));
+end
 
 
 mesh= ofem_v2.Geometry(); 

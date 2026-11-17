@@ -2,3 +2,5 @@
 *.asv
 .DS_Store
 **/export
+**/exportLeg
+**/exportTest
