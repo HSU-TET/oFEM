@@ -59,10 +59,7 @@ classdef AdditiveJacobi < handle
             else
                 C = A;
             end
-            B = zeros(Ns,Ns,Ne,'like',full(C(1)));
-            for e = 1:Ne
-                B(:,:,e) = full(C(E(e,:),E(e,:)));
-            end
+            B = extractBlocks(C,E,Nd);
             if obj.sweep
                 obj.Sb = real(B);
                 obj.Mb = imag(B);
@@ -206,6 +203,30 @@ function L = ictFactor(A,droptol)
                 rethrow(err);
             end
             alpha = max(2*alpha,1e-4);
+        end
+    end
+end
+
+function B = extractBlocks(C,E,Nd)
+    % B(:,:,e) = full(C(E(e,:),E(e,:))) for all elements at once. Indexing
+    % the sparse matrix element by element costs O(size of C) per element;
+    % here every entry is found by binary search in the sorted (column
+    % major) keys of the nonzeros.
+    [Ne,Ns] = size(E);
+    [ri,ci,v] = find(C);
+    skey = (ci-1)*Nd + ri;              % strictly increasing (CSC order)
+    clear ri ci
+    edges = [skey; Inf];
+    B = zeros(Ns,Ns,Ne,'like',v);
+    for j = 1:Ns
+        for i = 1:Ns
+            q = (E(:,j)-1)*Nd + E(:,i);
+            loc = discretize(q,edges);
+            hit = ~isnan(loc);
+            hit(hit) = skey(loc(hit)) == q(hit);   % entry stored in C
+            b = zeros(Ne,1,'like',v);
+            b(hit) = v(loc(hit));
+            B(i,j,:) = reshape(b,1,1,Ne);
         end
     end
 end
