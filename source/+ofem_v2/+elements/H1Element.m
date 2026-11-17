@@ -30,8 +30,9 @@ classdef H1Element < ofem_v2.elements.Finite_Elements & handle
 
             obj.dim = dim;
             obj.degree = deg;
-            obj.degreeMass = deg;
-            obj.degreeStiff = deg;
+            % exact for constant materials on affine elements
+            obj.degreeMass = 2*deg;
+            obj.degreeStiff = max(2*deg-2,0);
             obj.shape_function = 'H1';
         end
 
@@ -236,18 +237,12 @@ classdef H1Element < ofem_v2.elements.Finite_Elements & handle
                     dphi = pagemtimes(DinvT,dphi(:,:,refTet));
                     S = S+w(q)*pagemtimes(dphi,'transpose',materialTimes(mat(X),dphi),'none');
                 end
+                S = S.*abs(detD);
             else
-                for q=1:Nq
-                    cnt = ones(size(l(:,q),1),1);
-                    lTemp = mat2cell(l(:,q),cnt);
-                    dphi(:,:,1) = obj.dPhi{1}(lTemp{:});
-                    dphi(:,:,2) = obj.dPhi{2}(lTemp{:});
-                    dphi = pagemtimes(DinvT,dphi(:,:,refTet));
-                    S = S+w(q)*pagemtimes(dphi,'transpose',mat*dphi,'none');
-                end
+                % constant material: reference tensors
+                S = ofem_v2.tools.refTensorMatrices(obj.dPhi,w,l,refTet, ...
+                    ofem_v2.tools.geometryFactor(DinvT,mat,abs(detD)));
             end
-
-            S = pagemtimes(S,abs(detD));
 
             I = repmat(dofs,1,size(S,1))';
             I = I(:);
@@ -283,17 +278,12 @@ classdef H1Element < ofem_v2.elements.Finite_Elements & handle
                     phi = phi(:,:,refTet);
                     M = M+w(q)*pagemtimes(phi,'transpose',materialTimes(mat(X),phi),'none');
                 end
+                M = M.*abs(detD);
             else
-                for q=1:Nq
-                    cnt = ones(size(l(:,q),1),1);
-                    lTemp = mat2cell(l(:,q),cnt);
-                    phi(:,:,1) = obj.phi{1}(lTemp{:});
-                    phi(:,:,2) = obj.phi{2}(lTemp{:});
-                    phi = phi(:,:,refTet);
-                    M = M+w(q)*pagemtimes(phi,'transpose',mat*phi,'none');
-                end
+                % constant material: reference tensors
+                M = ofem_v2.tools.refTensorMatrices(obj.phi,w,l,refTet, ...
+                    ofem_v2.tools.geometryFactor([],mat,abs(detD)));
             end
-            M = pagemtimes(M,abs(detD));
 
             I = repmat(dofs,1,size(M,1))';
             %I = I(:);

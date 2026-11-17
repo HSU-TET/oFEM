@@ -33,8 +33,9 @@ classdef HCurlElement < ofem_v2.elements.Finite_Elements & handle
             obj.dim = dim;
             obj.degree = deg;
             if deg == 0; deg = 1; end
+            % exact for constant materials on affine elements
             obj.degreeMass = deg*2;
-            obj.degreeStiff = deg*2;
+            obj.degreeStiff = max(deg-1,0)*2;
         end
 
         function [N,curlN] = computeBasis(obj)
@@ -218,284 +219,153 @@ classdef HCurlElement < ofem_v2.elements.Finite_Elements & handle
 
 
         function S = assembleStiffness(obj,phys,pIdx,mat)
+            % int curl(u)' * mat * curl(v)
             refTet = phys.geometry.refTet(pIdx);
             [w,l] = ofem_v2.tools.gaussSimplex(obj.dim,obj.degreeStiff);
             dofs = phys.DOFs.el2DOF(pIdx,:);
             detD = phys.geometry.detD(:,:,pIdx);
             Dk = phys.geometry.Dk(:,:,pIdx);
-
-            Ns = obj.DOFsPerElement;
-            Nq = size(w   ,1);
-            Ne = length(pIdx);
-            Nl = size(phys.geometry.el,2);
-
-            S = zeros(Ns,Ns,Ne);
+            if obj.dim == 2
+                Dk = [];        % the 2D curl is a scalar: curl u = curl_ref/detD
+            end
 
             if isa(mat,'function_handle')
-                elco = reshape(phys.geometry.co(:,:,phys.geometry.el(pIdx,1:Nl)'),[],Nl,Ne);
-                for q=1:Nq
-                    cnt = ones(size(l(:,q),1),1);
-                    % local vertex 1 has barycentric 1-sum(l)
-                    X = pagemtimes(elco,[1-sum(l(:,q));l(:,q)]);
-                    lTemp = mat2cell(l(:,q),cnt);
-                    dphi(:,:,1) = obj.curlN{1}(lTemp{:});
-                    dphi(:,:,2) = obj.curlN{2}(lTemp{:});
-                    dphi = dphi(:,:,refTet);
-                    if obj.dim == 3
+                Ne = length(pIdx);
+                S = zeros(obj.DOFsPerElement,obj.DOFsPerElement,Ne);
+                X = quadPoints(phys,pIdx,l);
+                for q = 1:size(w,1)
+                    dphi = evalRef(obj.curlN,l(:,q),refTet);
+                    if ~isempty(Dk)
                         dphi = pagemtimes(Dk,dphi);
                     end
-                    S = S+w(q)*pagemtimes(dphi,'transpose',materialTimes(mat(X),dphi),'none');
+                    S = S+w(q)*pagemtimes(dphi,'transpose',materialTimes(mat(X{q}),dphi),'none');
                 end
+                S = S./abs(detD);
             else
-                for q=1:Nq
-                    cnt = ones(size(l(:,q),1),1);
-                    lTemp = mat2cell(l(:,q),cnt);
-                    dphi(:,:,1) = obj.curlN{1}(lTemp{:});
-                    dphi(:,:,2) = obj.curlN{2}(lTemp{:});
-                    dphi = dphi(:,:,refTet);
-                    if obj.dim == 3
-                        dphi = pagemtimes(Dk,dphi);
-                    end
-                    S = S+w(q)*pagemtimes(dphi,'transpose',mat*dphi,'none');
-                end
+                % constant material: reference tensors
+                S = ofem_v2.tools.refTensorMatrices(obj.curlN,w,l,refTet, ...
+                    ofem_v2.tools.geometryFactor(Dk,mat,1./abs(detD)));
             end
-            S = pagemtimes(S,1/abs(detD));
-
-            I = repmat(dofs,1,size(S,1))';
-            I = I(:);
-            J = repelem(dofs',size(S,1),1);
-            J = J(:);
-
-            S = sparse(I(:),J(:),S(:),phys.DOFs.Nd,phys.DOFs.Nd);
-
+            S = toSparse(phys,dofs,S);
         end
 
         function M = assembleMass(obj,phys,pIdx,mat)
+            % int u' * mat * v
             refTet = phys.geometry.refTet(pIdx);
             [w,l] = ofem_v2.tools.gaussSimplex(obj.dim,obj.degreeMass);
             dofs = phys.DOFs.el2DOF(pIdx,:);
             detD = phys.geometry.detD(:,:,pIdx);
             DinvT = phys.geometry.DinvT(:,:,pIdx);
 
-            Ns = obj.DOFsPerElement;
-            Nq = size(w   ,1);
-            Ne = length(pIdx);
-            Nl = size(phys.geometry.el,2);
-
-            M = zeros(Ns,Ns,Ne);
-
             if isa(mat,'function_handle')
-                elco = reshape(phys.geometry.co(:,:,phys.geometry.el(pIdx,1:Nl)'),[],Nl,Ne);
-                for q=1:Nq
-                    cnt = ones(size(l(:,q),1),1);
-                    % local vertex 1 has barycentric 1-sum(l)
-                    X = pagemtimes(elco,[1-sum(l(:,q));l(:,q)]);
-                    lTemp = mat2cell(l(:,q),cnt);
-                    phi(:,:,1) = obj.N{1}(lTemp{:});
-                    phi(:,:,2) = obj.N{2}(lTemp{:});
-
-                    % X = elco*(l(q,:)');
-                    % phii = DinvT(:,:,pIdx)'*(obj.N(:,:,q).*sign(Ne));
-                    % M = M+w(q)*(phii'*mat(X)*phii);
-                    phi = pagemtimes(DinvT,phi(:,:,refTet));
-                    M = M+w(q)*pagemtimes(phi,'transpose',materialTimes(mat(X),phi),'none');
+                Ne = length(pIdx);
+                M = zeros(obj.DOFsPerElement,obj.DOFsPerElement,Ne);
+                X = quadPoints(phys,pIdx,l);
+                for q = 1:size(w,1)
+                    phi = pagemtimes(DinvT,evalRef(obj.N,l(:,q),refTet));
+                    M = M+w(q)*pagemtimes(phi,'transpose',materialTimes(mat(X{q}),phi),'none');
                 end
+                M = M.*abs(detD);
             else
-                for q=1:Nq
-                    cnt = ones(size(l(:,q),1),1);
-                    lTemp = mat2cell(l(:,q),cnt);
-                    phi(:,:,1) = obj.N{1}(lTemp{:});
-                    phi(:,:,2) = obj.N{2}(lTemp{:});
-                    phi = pagemtimes(DinvT,phi(:,:,refTet));
-                    M = M+w(q)*pagemtimes(phi,'transpose',mat*phi,'none');
-                end
+                % constant material: reference tensors
+                M = ofem_v2.tools.refTensorMatrices(obj.N,w,l,refTet, ...
+                    ofem_v2.tools.geometryFactor(DinvT,mat,abs(detD)));
             end
-            M = pagemtimes(M,abs(detD));
-
-            I = repmat(dofs,1,size(M,1))';
-            %I = I(:);
-            J = repelem(dofs',size(M,1),1);
-            %J = J(:);
-
-            M = sparse(I(:),J(:),M(:),phys.DOFs.Nd,phys.DOFs.Nd);
-
-            % 			figure
-            %             spy(M)
+            M = toSparse(phys,dofs,M);
         end
 
-        function D = assembleDamping(obj,phys,pIdx,mat)
+        function D = assembleDamping(obj,phys,pIdx,mat) %#ok<INUSD>
+            D = [];
         end
 
         function D = assembleVelocityTerm(obj,phys,pIdx,mat,v)
+            % int u' * mat * (v x curl(w)), v a constant 3 x 1 vector, mat
+            % scalar, 3 x 3 or a function handle of the coordinates. In 2D
+            % u is extended by a zero third component and curl(w) = (0,0,curl).
+            refTet = phys.geometry.refTet(pIdx);
             [w,l] = ofem_v2.tools.gaussSimplex(obj.dim,obj.degreeMass);
             dofs = phys.DOFs.el2DOF(pIdx,:);
+            detD = phys.geometry.detD(:,:,pIdx);
             DinvT = phys.geometry.DinvT(:,:,pIdx);
             Dk = phys.geometry.Dk(:,:,pIdx);
-
             Ns = obj.DOFsPerElement;
-            Nq = size(w   ,1);
             Ne = length(pIdx);
-            Nl = size(phys.geometry.el,2);
+            if isa(mat,'function_handle')
+                X = quadPoints(phys,pIdx,l);
+            end
+            v = repmat(v(:),1,Ns,Ne);
 
             D = zeros(Ns,Ns,Ne);
-
-            refTet = phys.geometry.refTet(pIdx);
-
-            if isa(mat,'function_handle')
-                elco = reshape(phys.geometry.co(:,:,el(pIdx,1:Nl)'),[],Nl,Ne);
-                for q=1:Nq
-                    X = elco*(l(q,:)');
-                    %phii = DinvT(:,:,pIdx)'*(obj.N(:,:,q).*sign);
-                    phii = pagemtimes(DinvT(:,:,pIdx),obj.N(:,:,q));
-                    M = M+w(q)*(phii'*mat(X)*phii);
+            for q = 1:size(w,1)
+                phi = pagemtimes(DinvT,evalRef(obj.N,l(:,q),refTet));
+                c = evalRef(obj.curlN,l(:,q),refTet);
+                if obj.dim == 3
+                    c = pagemtimes(Dk,c)./detD;
+                else
+                    phi(3,:,:) = 0;
+                    c = [zeros(2,Ns,Ne); c./detD];
                 end
-            else
-                for q=1:Nq
-                    clear phi dphi
-                    cnt = ones(size(l(:,q),1),1);
-                    lTemp = mat2cell(l(:,q),cnt);
-                    phi(:,:,1) = obj.N{1}(lTemp{:});
-                    phi(:,:,2) = obj.N{2}(lTemp{:});
-                    dphi(:,:,1) = obj.curlN{1}(lTemp{:});
-                    dphi(:,:,2) = obj.curlN{2}(lTemp{:});
-                    dphi = dphi(:,:,refTet);
-                    if obj.dim == 3
-                        dphi = pagemtimes(Dk*dphi);
-                    end
-                    % inflate dphi from 1D to 3D
-                    if obj.dim == 2
-                        dphi = [zeros(size(dphi));zeros(size(dphi));dphi];
-                    end
-                    dphi =  cross(repmat(v,1,Ns,length(pIdx)),dphi);
-                    
-                    phi =  pagemtimes(DinvT,phi(:,:,refTet));
-                    if obj.dim == 2
-                        phi(3,:,:) = 0;
-                    end
-                    D = D+w(q)*pagemtimes(phi,"transpose",pagemtimes(mat,dphi),'none');
+                vc = cross(v,c,1);
+                if isa(mat,'function_handle')
+                    vc = materialTimes(mat(X{q}),vc);
+                else
+                    vc = materialTimes(mat,vc);
                 end
+                D = D+w(q)*pagemtimes(phi,'transpose',vc,'none');
             end
-
-            I = repmat(dofs,1,size(D,1))';
-            I = I(:);
-            J = repelem(dofs',size(D,1),1);
-            J = J(:);
-
-            D = sparse(I(:),J(:),D(:),phys.DOFs.Nd,phys.DOFs.Nd);
+            D = toSparse(phys,dofs,D.*abs(detD));
         end
 
         function F = volumeForce(obj,phys,f,pIdx)
+            % int f . v, f a constant vector, a function handle of the
+            % coordinates, values per element (dim x 1 x Ne) or at the
+            % quadrature points (dim x Nq x Ne)
             [w,l] = ofem_v2.tools.gaussSimplex(obj.dim,obj.degreeMass);
             dofs = phys.DOFs.el2DOF(pIdx,:);
             detD = phys.geometry.detD(:,:,pIdx);
             DinvT = phys.geometry.DinvT(:,:,pIdx);
-
-            Ns = obj.DOFsPerElement;
-            Nq = size(w   ,1);
-            Ne = length(pIdx);
-            Nl = size(phys.geometry.el,2);
-
-            F = zeros(1,Ns,Ne);
-
             refTet = phys.geometry.refTet(pIdx);
-
+            Ne = length(pIdx);
+            F = zeros(1,obj.DOFsPerElement,Ne);
+            X = {};
             if isa(f,'function_handle')
-                elco = reshape(phys.geometry.co(:,:,phys.geometry.el(pIdx,1:Nl)'),[],Nl,Ne);
-                for q=1:Nq
-                    X = pagemtimes(elco,[1-sum(l(:,q));l(:,q)]);
-                    A = f(X);
-                    phi(:,:,1) = obj.N{1}(l(1,q),l(2,q),l(3,q));
-                    phi(:,:,2) = obj.N{2}(l(1,q),l(2,q),l(3,q));
-                    phi =  pagemtimes(DinvT,phi(:,:,refTet));
-                    F = F+w(q)*pagemtimes(A,'transpose',phi,'none');
-                end
-            elseif size(f,3)>1
-                f = f(:,:,pIdx);
-                for q=1:Nq
-                    cnt = ones(size(l(:,q),1),1);
-                    lTemp = mat2cell(l(:,q),cnt);
-                    phi(:,:,1) = obj.N{1}(lTemp{:});
-                    phi(:,:,2) = obj.N{2}(lTemp{:});
-                    phi =  pagemtimes(DinvT,phi(:,:,refTet));
-                    if size(f,2)>1
-                        F = F+w(q)*pagemtimes(f(:,q,:),'transpose',phi,'none');
-                    else
-                        F = F+w(q)*pagemtimes(f,'transpose',phi,'none');
-                    end
-                end
-            else
-                for q=1:Nq
-                    cnt = ones(size(l(:,q),1),1);
-                    lTemp = mat2cell(l(:,q),cnt);
-                    phi(:,:,1) = obj.N{1}(lTemp{:});
-                    phi(:,:,2) = obj.N{2}(lTemp{:});
-                    phi =  pagemtimes(DinvT,phi(:,:,refTet));
-                    F = F+w(q)*pagemtimes(f,'transpose',phi,'none');
-                end
+                X = quadPoints(phys,pIdx,l);
+            elseif size(f,3) > 1
+                f = double(f(:,:,pIdx));
             end
-
-            F = pagemtimes(F,'transpose',abs(detD),'none');
-
-            I = dofs';
-            I = I(:);
-
-            F = sparse(I(:),1,F(:),phys.DOFs.Nd,1);
+            for q = 1:size(w,1)
+                phi = pagemtimes(DinvT,evalRef(obj.N,l(:,q),refTet));
+                F = F+w(q)*pagemtimes(loadValues(f,X,q),'transpose',phi,'none');
+            end
+            F = F.*abs(detD);
+            F = sparse(reshape(dofs',[],1),1,F(:),phys.DOFs.Nd,1);
         end
 
         function F = derivativeForce(obj,phys,f,pIdx)
+            % int f . curl(v), f as in volumeForce (a scalar field in 2D)
             [w,l] = ofem_v2.tools.gaussSimplex(obj.dim,obj.degreeMass);
             dofs = phys.DOFs.el2DOF(pIdx,:);
             detD = phys.geometry.detD(:,:,pIdx);
             Dk = phys.geometry.Dk(:,:,pIdx);
-
-            Ns = obj.DOFsPerElement;
-            Nq = size(w   ,1);
-            Ne = length(pIdx);
-            Nl = size(phys.geometry.el,2);
-
-            F = ofem_v2.tools.matrixarray(zeros(1,Ns,Ne));
-
             refTet = phys.geometry.refTet(pIdx);
-
+            Ne = length(pIdx);
+            F = zeros(1,obj.DOFsPerElement,Ne);
+            X = {};
             if isa(f,'function_handle')
-                elco = reshape(phys.geometry.co(:,:,phys.geometry.el(pIdx,1:Nl)'),[],Nl,Ne);
-                for q=1:Nq
-                    X = pagemtimes(elco,[1-sum(l(:,q));l(:,q)]);
-                    A = ofem_v2.tools.matrixarray(f(X));
-                    phi(:,:,1) = obj.curlN{1}(l(1,q),l(2,q),l(3,q));
-                    phi(:,:,2) = obj.curlN{2}(l(1,q),l(2,q),l(3,q));
-                    phi =  Dk*ofem_v2.tools.matrixarray(phi(:,:,refTet));
-                    F = F+w(q)*(A'*phi);
-                end
-            elseif isa(f,'ofem_v2.tools.matrixarray')
-                for q=1:Nq
-                    phi(:,:,1) = obj.curlN{1}(l(1,q),l(2,q),l(3,q));
-                    phi(:,:,2) = obj.curlN{2}(l(1,q),l(2,q),l(3,q));
-                    phi =  Dk*ofem_v2.tools.matrixarray(phi(:,:,refTet));
-                    F = F+w(q)*(f'*phi);
-                    %                 % accepts rhs data converted to integration points of the
-                    %                 % shape dim(f) dim(q) dim(el)
-                    %                     phi(:,:,1) = obj.curlN{1}(l(1,q),l(2,q),l(3,q));
-                    %                     phi(:,:,2) = obj.curlN{2}(l(1,q),l(2,q),l(3,q));
-                    %                     phi =  DinvT*ofem_v2.tools.matrixarray(phi(:,:,refTet));
-                    %                     F = F+w(q)*(f(:,q,:)'*phi);
-                end
-            else
-                f = ofem_v2.tools.matrixarray(repmat(f,1,1,Ne));
-                for q=1:Nq
-                    phi(:,:,1) = obj.curlN{1}(l(1,q),l(2,q),l(3,q));
-                    phi(:,:,2) = obj.curlN{2}(l(1,q),l(2,q),l(3,q));
-                    phi =  Dk*ofem_v2.tools.matrixarray(phi(:,:,refTet));
-                    F = F+w(q)*(f'*phi);
-                end
+                X = quadPoints(phys,pIdx,l);
+            elseif size(f,3) > 1
+                f = double(f(:,:,pIdx));
             end
-
-            F = F;
-
-            I = dofs';
-            I = I(:);
-
-            F = sparse(I(:),1,F(:),phys.DOFs.Nd,1);
+            for q = 1:size(w,1)
+                c = evalRef(obj.curlN,l(:,q),refTet);
+                if obj.dim == 3
+                    c = pagemtimes(Dk,c);
+                end
+                F = F+w(q)*pagemtimes(loadValues(f,X,q),'transpose',c,'none');
+            end
+            % curl v = (Dk) curl_ref/detD, dx = |detD| dx_ref
+            F = F.*sign(detD);
+            F = sparse(reshape(dofs',[],1),1,F(:),phys.DOFs.Nd,1);
         end
 
         function U = el2edges(obj,phys,u)
@@ -621,4 +491,42 @@ function B = materialTimes(A,P)
     else
         B = pagemtimes(A,P);
     end
+end
+
+function P = evalRef(fun,lq,refTet)
+    % basis (or curl) at the reference point lq for both reference
+    % elements, selected per element
+    c = num2cell(lq);
+    P = cat(3,fun{1}(c{:}),fun{2}(c{:}));
+    P = P(:,:,refTet);
+end
+
+function X = quadPoints(phys,pIdx,l)
+    % physical coordinates of the quadrature points, X{q}: dim x 1 x Ne
+    g = phys.geometry;
+    Nl = size(l,1)+1;
+    elco = reshape(g.co(:,:,g.el(pIdx,1:Nl)'),[],Nl,numel(pIdx));
+    X = cell(1,size(l,2));
+    for q = 1:size(l,2)
+        % local vertex 1 has barycentric 1-sum(l)
+        X{q} = pagemtimes(elco,[1-sum(l(:,q));l(:,q)]);
+    end
+end
+
+function A = loadValues(f,X,q)
+    % load values at quadrature point q: c x 1 x Ne or c x 1
+    if isa(f,'function_handle')
+        A = double(f(X{q}));
+    elseif size(f,3) > 1 && size(f,2) > 1
+        A = f(:,q,:);
+    else
+        A = double(f);
+    end
+end
+
+function A = toSparse(phys,dofs,A)
+    Ns = size(A,1);
+    I = repmat(dofs,1,Ns)';
+    J = repelem(dofs',Ns,1);
+    A = sparse(I(:),J(:),A(:),phys.DOFs.Nd,phys.DOFs.Nd);
 end
