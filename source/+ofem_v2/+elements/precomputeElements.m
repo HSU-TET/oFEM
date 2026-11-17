@@ -20,3 +20,12 @@ for dim = 2:3
 		save([s,'HCurl_',num2str(dim),'D_','Order_',num2str(deg),'.mat'],'fe');
 	end
 end
+
+% H Div
+for dim = 2:3
+	for deg = 0:5
+		fe = ofem_v2.elements.HDivElement(dim,deg);
+		fe.computeBasis;
+		save([s,'HDiv_',num2str(dim),'D_','Order_',num2str(deg),'.mat'],'fe');
+	end
+end
