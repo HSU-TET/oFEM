@@ -84,37 +84,48 @@ classdef DOFHandler < handle
         end
         
         function DOFs = AMSDOFs(obj,phys)
+            % Columns of HCurlElement.AMS that vanish on the Dirichlet
+            % boundary: the nodes not on a fixed boundary, then the
+            % non-Whitney DOFs of the edges / faces not on a fixed
+            % boundary and all interior DOFs. All fixed boundaries are
+            % excluded (the previous version reset the edge and face lists
+            % for every boundary, so only the last one was excluded, and it
+            % also excluded the nodes of natural boundaries).
             Nco = phys.geometry.Nco;
             Ned = phys.geometry.Ned;
             Nfa = phys.geometry.Nfa;
             deg = phys.element.degree;
-            nDofs = 1:Nco;
+            bdNodes = [];
+            bdEdges = [];
+            bdFaces = [];
+            if size(phys.geometry.bd,1) >= 3
+                for i = 1:size(phys.geometry.bd,2)
+                    c = phys.geometry.bd{3,i};
+                    if isempty(c) || ~isa(c,'ofem_v2.boundary.FixedBoundary')
+                        continue;
+                    end
+                    bdNodes = [bdNodes; c.boundary(:)]; %#ok<AGROW>
+                    bdEdges = [bdEdges; c.edges(:)]; %#ok<AGROW>
+                    bdFaces = [bdFaces; c.faces(:)]; %#ok<AGROW>
+                end
+            end
+            nDofs = setdiff(1:Nco,bdNodes);
             eDofs = [];
             fDofs = [];
             iDofs = [];
-            for i = 1:size(phys.geometry.bd,2)
-                if isempty(phys.geometry.bd{3,i})
-                    continue;
-                end
-                nDofs = setdiff(nDofs,phys.geometry.bd{3,i}.nodes);
-                if deg > 0
-                    eDofs = 1:Ned;
-                    eDofs = setdiff(eDofs,phys.geometry.bd{3,i}.edges);
-                    eDofs = eDofs'+((0:deg-1)*Ned);
-                    eDofs = sort(eDofs(:))+Nco;
-                end
-                if phys.element.faceDOFs > 0
-                    fDofs = 1:Nfa;
-                    fDofs = setdiff(fDofs,phys.geometry.bd{3,i}.faces);
-                    fDofs = obj.f2DOF(fDofs,:);
-                    fDofs = sort(fDofs(:))-Ned+Nco;
-                end
-                if phys.element.interiorDOFs > 0
-                    iDofs = unique(obj.iDOFs(:));
-                    iDofs = iDofs + Nco-Ned;
-                end
+            if deg > 0
+                e = setdiff(1:Ned,bdEdges);
+                eDofs = e'+((0:deg-1)*Ned);
+                eDofs = sort(eDofs(:))+Nco;
             end
-            DOFs = [nDofs,eDofs',fDofs',iDofs'];
+            if phys.element.faceDOFs > 0
+                fDofs = obj.f2DOF(setdiff(1:Nfa,bdFaces),:);
+                fDofs = sort(fDofs(:))-Ned+Nco;
+            end
+            if phys.element.interiorDOFs > 0
+                iDofs = unique(obj.iDOFs(:)) + Nco-Ned;
+            end
+            DOFs = [nDofs(:)',eDofs(:)',fDofs(:)',iDofs(:)'];
         end
 		
 		function reduceDOFs(obj,BD)

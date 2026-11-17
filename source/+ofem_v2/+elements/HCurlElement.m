@@ -465,8 +465,12 @@ classdef HCurlElement < ofem_v2.elements.Finite_Elements & handle
                 sten1 = sparse(diag([1,0,0]));
                 sten2 = sparse(diag([1,0]));
 
-                eye1 = speye(sum(1:obj.degree-1));
-                eye2 = speye(sum(sum(triu(repelem(1:obj.degree-2,obj.degree-2,1)'))));
+                % interior functions per (i,j): [grad(m*n), grad(m)*n - m*grad(n)]
+                % plus a Whitney*n function if i == 0; first the degree-1
+                % groups with i == 0 (j = 0..degree-2), then sum(1:degree-2)
+                % groups with i >= 1
+                eye1 = speye(obj.degree-1);
+                eye2 = speye(sum(1:obj.degree-2));
 
                 stencil = blkdiag(kron(eye1,sten1),kron(eye2,sten2));
 

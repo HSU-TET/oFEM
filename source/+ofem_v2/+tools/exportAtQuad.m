@@ -1,183 +1,75 @@
 function exportAtQuad(folder_name,file_name,X,meta,varargin)
-%EXPORTATQUAD Summary of this function goes here
-%   Detailed explanation goes here
-                % create output file________________________________________________
-            if ~exist(folder_name,'dir')
-                warning('ofem:mesh:FolderNotExistent',...
-                        'The given folder is not existent, still I''ll create it.');
-                mkdir(folder_name);
-            end
+%EXPORTATQUAD exports values at arbitrary points (e.g. quadrature points)
+%as a UCD point cloud (.inp, readable by ParaView)
+%
+%   exportAtQuad(folder_name, file_name, X, {name, values, unit}, ...)
+%
+%   X       points, N x dim, or dim x Ne x Np as returned by
+%           ofem_v2.tools.reconstruct
+%   values  N x k, or k x Ne x Np (same layout as X)
+%
+%   Every point becomes a 'pt' cell, the values are written as node data.
+%   (The previous version referenced undefined variables and wrote an
+%   invalid header, so it could not run.)
 
-            [pathstr,file_name,ext]=fileparts(file_name);
-            if ~isempty(pathstr) % user requested current working directory
-                warning('ofem:mesh:InvalidArgument',...
-                        'file_name contains a path. I''ll ignore it');
-            end
-            if isempty(ext)
-                file_name=strcat(file_name,'.inp');
-            end
-            file_name=fullfile(folder_name,file_name);
+    if ~exist(folder_name,'dir')
+        mkdir(folder_name);
+    end
+    [pathstr,file_name,ext] = fileparts(file_name);
+    if ~isempty(pathstr)
+        warning('ofem:mesh:InvalidArgument','file_name contains a path. I''ll ignore it');
+    end
+    if isempty(ext)
+        ext = '.inp';
+    end
+    file_name = fullfile(folder_name,[file_name,ext]);
 
+    P = toRows(X);
+    Nn = size(P,1);
+    co = zeros(Nn,3);
+    co(:,1:size(P,2)) = P;
 
-            % basic computations________________________________________________
-            Nf   = nargin-3         ; % number of functions
-%            Nc   = size(obj.el,1)   ; % number of cells
-            Nn   = size(X,1)          ; % number of nodes
-%             Nn  = size(obj.co,1);
-%            Nm   = size(obj.parts,2); % number of materials
-            type = 'tet';
+    fields = [{meta},varargin];
+    names = cell(1,numel(fields));
+    units = names;
+    cols = zeros(1,numel(fields));
+    sol = zeros(Nn,0);
+    for i = 1:numel(fields)
+        f = fields{i};
+        if numel(f) < 3
+            error('ofem:exportAtQuad:InvalidArgument','meta must be {name, values, unit}.');
+        end
+        v = full(toRows(f{2}));
+        if size(v,1) ~= Nn
+            error('ofem:exportAtQuad:InvalidArgument', ...
+                'Field %s has %d values for %d points.',f{1},size(v,1),Nn);
+        end
+        names{i} = f{1};
+        units{i} = f{3};
+        cols(i) = size(v,2);
+        sol = [sol, v]; %#ok<AGROW>
+    end
 
-            % 
-            name{1} = 0;
-            unit{1} = 0;
-            Nfd  = 0;
-            nameC{1} = 0;
-            unitC{1} = 0;
-            NfdC  = 0;
-            solC = [];
-            sol = [];
-            j = 0;
-            k = 0;
-
-            if issparse(meta{2})
-                warning('ofem:mesh:InvalidArgument',...
-                        'u is not allowed to be sparse. I''ll convert it to full');
-            end
-            if numel(meta)~=4&&numel(meta)~=3
-                error('ofem:mesh:InvalidArgument',...
-                      'meta is expected to be a cell array with numel(meta)==4');
-            end
-            if numel(meta)==3
-                name{1} = meta{1};
-                sol     = full(meta{2});
-                Nfd (1) = size(meta{2},2);
-                unit{1} = meta{3};
-                j = j+1;
-            elseif meta{4} =='Cell'
-                nameC{1} = meta{1};
-                solC     = full(meta{2});
-                NfdC(1)  = size(meta{2},2);
-                unitC{1} = meta{3};
-                k = k+1;
-            end
-            
-
-            for i=1:nargin-4
-                if issparse(varargin{i}{2})
-                error('ofem:mesh:InvalidArgument',...
-                      'u is not allowed to be sparse. I''ll convert it to full');
-                end
-                if numel(varargin{i})~=4&&numel(varargin{i})~=3
-                    error('ofem:mesh:InvalidArgument',...
-                          'meta is expected to be a cell array with numel(meta)==4');
-                end
-
-                if numel(varargin{i})==3
-                    name{j+1} = varargin{i}{1};
-                    Nfd (j+1) = size(varargin{i}{2},2);
-                    unit{j+1} = varargin{i}{3};
-                    sol(:,end+(1:Nfd(j+1))) = full(varargin{i}{2});
-                    j = j+1;
-                elseif varargin{i}{4} == 'Cell'
-                    nameC{k+1} = varargin{i}{1};
-                    NfdC(k+1)  = size(varargin{i}{2},2);
-                    unitC{k+1} = varargin{i}{3};
-                    solC(:,end+(1:NfdC(k+1))) = full(varargin{i}{2});
-                    k = k+1;
-                end
-
-            end
-
-
-            % begin of export________________________________________________
-            tic
-            fprintf('Starting data export ... ');
-            fileID = fopen(file_name,'w+');
-
-            % UCD format
-
-            % header => #nodes #cells #nodedata #celldata #classdata
-            fprintf(fileID,'%d %d %d %d 0 \r\n',Nn, ...
-                                               size(sol,2),...
-                                               size(solC,2));
-
-            % nodes => nodeID <x_1> <x_2> <x_3>
-            %co_virt=zeros(X,3);
-            co_virt = X;
-            fprintf(fileID,'%d %e %e %e\r\n',[1:Nn;co_virt']);
-
-            % cells => cellID matID type <nodeID_1> ... <nodeID_N>
-            currID=0;
-
-            % As of now ParaView, or more precisely VTK, does not support
-            % reading higher order elements although, at least, second
-            % order elements are supported by UCD.
-            switch type
-                case 'line'
-                    formatStr = '%d %d line %d %d\r\n';
-                    c2nidx = 1:2;
-                case 'tri'
-                    formatStr = '%d %d tri %d %d %d\r\n';
-                    c2nidx = 1:3;
-                case 'tet'
-                    formatStr = '%d %d tet %d %d %d %d\r\n';
-                    c2nidx = 1:4;
-                case 'quad'
-                    formatStr = '%d %d quad %d %d %d %d\r\n';
-                    c2nidx = 1:4;
-                case 'hex'
-                    formatStr = '%d %d hex %d %d %d %d %d %d %d %d\r\n';
-                    c2nidx = 1:8;
-                otherwise
-                    error('ofem:mesh:InvalidMesh',...
-                          'Unsupported mesh found. Type is %s',obj.type);
-            end
-        
-%             formatStr = ['%d %d ',obj.type,repmat(' %d',1,size(obj.el,2)),'\r\n'];
-            
-            for i=1:Nm
-                partIDs  = obj.parts{3,i};
-				partIDs = reshape(partIDs,1,[]);
-                NpartIDs = numel(partIDs);
-                fprintf(fileID,formatStr,[partIDs; i*ones(1,NpartIDs); obj.el(partIDs,c2nidx)']);
-                currID=currID+NpartIDs;
-            end
-
-            % write functions________________________________________________
-            % header => #func #colsfunc_1 ... #colsfunc_N
-
-
-            % values => nodeID funcval_1 ... funcval_N
-            if Nfd~=0
-                fprintf(fileID,'%d ',[size(Nfd,2), Nfd]);
-                fprintf(fileID,'\r\n');
-
-                % names, units
-                for i=1:size(Nfd,2)
-                    fprintf(fileID,'%s, %s\r\n',name{i},unit{i});
-                end
-                formatStr = ['%d ',repmat(' %e',1,size(sol,2)),'\r\n'];
-                fprintf(fileID,formatStr,[1:Nn;sol(1:Nn,:)']);
-            end
-            
-            if NfdC ~=0
-                fprintf(fileID,'%d ',[size(NfdC,2), NfdC]);
-                fprintf(fileID,'\r\n');
-
-                % names, units
-                for i=1:size(NfdC,2)
-                    fprintf(fileID,'%s, %s\r\n',nameC{i},unitC{i});
-                end
-                formatStr = ['%d ',repmat(' %e',1,size(solC,2)),'\r\n'];
-                fprintf(fileID,formatStr,[1:Nc;solC(1:Nc,:)']);
-            end
-
-            % close file print info and exit________________________________________________
-            fclose(fileID);
-
-            t=toc;
-            fprintf('done. t=%f s\n',t);
-    
-    
+    fid = fopen(file_name,'w');
+    fprintf(fid,'%d %d %d 0 0\r\n',Nn,Nn,size(sol,2));
+    fprintf(fid,'%d %e %e %e\r\n',[1:Nn; co']);
+    fprintf(fid,'%d 1 pt %d\r\n',[1:Nn; 1:Nn]);
+    if ~isempty(sol)
+        fprintf(fid,'%d',numel(fields));
+        fprintf(fid,' %d',cols);
+        fprintf(fid,'\r\n');
+        for i = 1:numel(fields)
+            fprintf(fid,'%s, %s\r\n',names{i},units{i});
+        end
+        fprintf(fid,['%d',repmat(' %e',1,size(sol,2)),'\r\n'],[1:Nn; sol']);
+    end
+    fclose(fid);
 end
 
+function A = toRows(A)
+    % N x k from N x k, or k x Ne x Np (k <= 3) to (Ne*Np) x k
+    A = double(A);
+    if ndims(A) == 3
+        A = reshape(A,size(A,1),[])';
+    end
+end

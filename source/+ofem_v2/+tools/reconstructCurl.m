@@ -28,7 +28,8 @@ function [X,U] = reconstructCurl(phys,u)
     elco = reshape(phys.geometry.co(:,:,phys.geometry.el(:,:)'),[],Nl,Ne);
     X = zeros(dim,Ne,Np);
     for i = 1:Np
-        X(:,:,i) = reshape(pagemtimes(elco,l(:,i)),dim,[]);
+        % l(end,:) = 1-sum(l) is the barycentric coordinate of local vertex 1
+        X(:,:,i) = reshape(pagemtimes(elco,l([end,1:end-1],i)),dim,[]);
     end    
 
     elu = reshape(u(phys.DOFs.el2DOF(:,:)'),[],1,Ne);

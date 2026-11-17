@@ -34,9 +34,11 @@ function [Mx,My,Mz,M] = matrixCurlRecovery(mesh,feCurl,feH)
         M = M + w(q)*pagemtimes(phiN,'transpose',phiN,'none');
     end
 
-    % Mx = pagemtimes(Mx,abs(detD));
-    % My = pagemtimes(My,abs(detD));
-    % Mz = pagemtimes(Mz,abs(detD));
+    % curl phi = Dk*curl_ref/detD and dx = |detD| dx_ref: factor sign(detD)
+    % (it was missing, i.e. only positively oriented elements were right)
+    Mx = Mx.*sign(detD);
+    My = My.*sign(detD);
+    Mz = Mz.*sign(detD);
     M = pagemtimes(M,abs(detD));
     
     I = repmat(dofsN,1,size(Mx,2))';

@@ -319,7 +319,8 @@ classdef Geometry < handle
                           'hypercube requested for dim>3');
             end
 
-            obj.co = ofem_v2.tools.matrixarray(permute(obj.co,[2,3,1]));
+            % plain doubles like load_from_msh (jacobiandata uses pagemtimes)
+            obj.co = permute(obj.co,[2,3,1]);
 
             % parts
             obj.parts = {'hypercube';1;(1:size(obj.el,1))'};
@@ -397,7 +398,7 @@ classdef Geometry < handle
                         elem(:,[6,8, 3,10]); ...
                         elem(:,[7,9,10, 4]); ...
                         elem(:,[7,5, 6, 9]); ...
-                        elem(:,[5,8, 6,10]); ...
+                        elem(:,[5,8, 6, 9]); ... % must contain the diagonal 6-9 (was [5,8,6,10]: non-conforming)
                         elem(:,[6,8,10, 9]); ...
                         elem(:,[7,9, 6,10]); ...
                         ];
@@ -1256,13 +1257,22 @@ classdef Geometry < handle
             % idx. x is suposed to be a matrixarray with the same structure
             % as mesh.co. idx is an indexvector containing the element's
             % numbers x is in.
+            % x: dim x 1 x N, idx: N element indices (NaN for points
+            % outside the mesh, their coordinates are NaN). Returns N x dim+1.
             if isempty(obj.DinvT)
                 obj.jacobiandata
             end
-            
-            bary = obj.DinvT(:,:,idx)'*(x-obj.co(:,1,obj.el(idx,1)));
-            bary = [1-sum(bary,1); bary];
-            bary = double(permute(bary,[3,1,2]));
+            x = double(x);
+            idx = idx(:);
+            in = ~isnan(idx);
+            bary = nan(obj.dim+1,1,numel(idx));
+            if any(in)
+                e = idx(in);
+                y = pagemtimes(double(obj.DinvT(:,:,e)),'transpose', ...
+                    x(:,:,in)-double(obj.co(:,1,obj.el(e,1))),'none');
+                bary(:,:,in) = [1-sum(y,1); y];
+            end
+            bary = permute(bary,[3,1,2]);
         end
         
         function reorderAC(obj)
