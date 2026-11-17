@@ -231,9 +231,10 @@ classdef H1Element < ofem_v2.elements.Finite_Elements & handle
                     lTemp = mat2cell(l(:,q),cnt);
                     dphi(:,:,1) = obj.dPhi{1}(lTemp{:});
                     dphi(:,:,2) = obj.dPhi{2}(lTemp{:});
-                    X = elco*[l(:,q);1-sum(l(:,q))];
+                    % local vertex 1 has barycentric 1-sum(l)
+                    X = pagemtimes(elco,[1-sum(l(:,q));l(:,q)]);
                     dphi = pagemtimes(DinvT,dphi(:,:,refTet));
-                    S = S+w(q)*pagemtimes(dphi,'transpose',pagemtimes(mat(X),dphi),'none');
+                    S = S+w(q)*pagemtimes(dphi,'transpose',materialTimes(mat(X),dphi),'none');
                 end
             else
                 for q=1:Nq
@@ -277,9 +278,10 @@ classdef H1Element < ofem_v2.elements.Finite_Elements & handle
                     lTemp = mat2cell(l(:,q),cnt);
                     phi(:,:,1) = obj.phi{1}(lTemp{:});
                     phi(:,:,2) = obj.phi{2}(lTemp{:});
-                    X = elco*[l(:,q);1-sum(l(:,q))];
+                    % local vertex 1 has barycentric 1-sum(l)
+                    X = pagemtimes(elco,[1-sum(l(:,q));l(:,q)]);
                     phi = phi(:,:,refTet);
-                    M = M+w(q)*pagemtimes(phi,'transpose',pagemtimes(mat(X),phi),'none');
+                    M = M+w(q)*pagemtimes(phi,'transpose',materialTimes(mat(X),phi),'none');
                 end
             else
                 for q=1:Nq
@@ -321,11 +323,14 @@ classdef H1Element < ofem_v2.elements.Finite_Elements & handle
             if isa(value,'function_handle')
                 loco = reshape(phys.geometry.co(:,:,phys.geometry.el(pIdx,:)'),[],Nl,Ne);
                 for q=1:Nq
-                    X = loco*([l(:,q);1-sum(l(:,q))]);
+                    % local vertex 1 has barycentric 1-sum(l)
+                    X = pagemtimes(loco,[1-sum(l(:,q));l(:,q)]);
                     cnt = ones(size(l(:,q),1),1);
                     lTemp = mat2cell(l(:,q),cnt);
-                    phi = obj.phi{1}(lTemp{:});
-                    F = F+w(q)*(phi'*value(X));
+                    phi(:,:,1) = obj.phi{1}(lTemp{:});
+                    phi(:,:,2) = obj.phi{2}(lTemp{:});
+                    phi = phi(:,:,refTet);
+                    F = F+w(q)*pagemtimes(phi,'transpose',double(value(X)),'none');
                 end
             elseif size(value,3)>1
                 for q=1:Nq
@@ -340,7 +345,9 @@ classdef H1Element < ofem_v2.elements.Finite_Elements & handle
                 for q=1:Nq
                     cnt = ones(size(l(:,q),1),1);
                     lTemp = mat2cell(l(:,q),cnt);
-                    phi = obj.phi{1}(lTemp{:});
+                    phi(:,:,1) = obj.phi{1}(lTemp{:});
+                    phi(:,:,2) = obj.phi{2}(lTemp{:});
+                    phi = phi(:,:,refTet);
                     F = F+w(q)*pagemtimes(phi,'transpose',value,'none');
                 end
             end
@@ -352,32 +359,13 @@ classdef H1Element < ofem_v2.elements.Finite_Elements & handle
     end
 end
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+function B = materialTimes(A,P)
+    % material values A (1 x 1 x Ne scalar or d x d x Ne tensor) times the
+    % basis values P (d x Ns x Ne)
+    A = double(A);
+    if size(A,1) == 1 && size(A,2) == 1
+        B = A.*P;
+    else
+        B = pagemtimes(A,P);
+    end
+end

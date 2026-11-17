@@ -235,8 +235,8 @@ classdef HCurlElement < ofem_v2.elements.Finite_Elements & handle
                 elco = reshape(phys.geometry.co(:,:,phys.geometry.el(pIdx,1:Nl)'),[],Nl,Ne);
                 for q=1:Nq
                     cnt = ones(size(l(:,q),1),1);
-                    ltemp = [l(:,q)',(1-sum(l(:,q)))'];
-                    X = elco*ltemp';
+                    % local vertex 1 has barycentric 1-sum(l)
+                    X = pagemtimes(elco,[1-sum(l(:,q));l(:,q)]);
                     lTemp = mat2cell(l(:,q),cnt);
                     dphi(:,:,1) = obj.curlN{1}(lTemp{:});
                     dphi(:,:,2) = obj.curlN{2}(lTemp{:});
@@ -244,7 +244,7 @@ classdef HCurlElement < ofem_v2.elements.Finite_Elements & handle
                     if obj.dim == 3
                         dphi = pagemtimes(Dk,dphi);
                     end
-                    S = S+w(q)*pagemtimes(dphi,'transpose',pagemtimes(double(mat(X)),dphi),'none');
+                    S = S+w(q)*pagemtimes(dphi,'transpose',materialTimes(mat(X),dphi),'none');
                 end
             else
                 for q=1:Nq
@@ -288,8 +288,8 @@ classdef HCurlElement < ofem_v2.elements.Finite_Elements & handle
                 elco = reshape(phys.geometry.co(:,:,phys.geometry.el(pIdx,1:Nl)'),[],Nl,Ne);
                 for q=1:Nq
                     cnt = ones(size(l(:,q),1),1);
-                    ltemp = [l(:,q)',(1-sum(l(:,q)))'];
-                    X = elco*ltemp';
+                    % local vertex 1 has barycentric 1-sum(l)
+                    X = pagemtimes(elco,[1-sum(l(:,q));l(:,q)]);
                     lTemp = mat2cell(l(:,q),cnt);
                     phi(:,:,1) = obj.N{1}(lTemp{:});
                     phi(:,:,2) = obj.N{2}(lTemp{:});
@@ -297,11 +297,8 @@ classdef HCurlElement < ofem_v2.elements.Finite_Elements & handle
                     % X = elco*(l(q,:)');
                     % phii = DinvT(:,:,pIdx)'*(obj.N(:,:,q).*sign(Ne));
                     % M = M+w(q)*(phii'*mat(X)*phii);
-                    phi = phi(:,:,refTet);
-                    if obj.dim == 3
-                        phi = pagemtimes(DinvT,phi);
-                    end
-                    M = M+w(q)*pagemtimes(phi,'transpose',pagemtimes(double(mat(X)),phi),'none');
+                    phi = pagemtimes(DinvT,phi(:,:,refTet));
+                    M = M+w(q)*pagemtimes(phi,'transpose',materialTimes(mat(X),phi),'none');
                 end
             else
                 for q=1:Nq
@@ -405,7 +402,7 @@ classdef HCurlElement < ofem_v2.elements.Finite_Elements & handle
             if isa(f,'function_handle')
                 elco = reshape(phys.geometry.co(:,:,phys.geometry.el(pIdx,1:Nl)'),[],Nl,Ne);
                 for q=1:Nq
-                    X = pagemtimes(elco,([l(:,q);1-sum(l(:,q))]));
+                    X = pagemtimes(elco,[1-sum(l(:,q));l(:,q)]);
                     A = f(X);
                     phi(:,:,1) = obj.N{1}(l(1,q),l(2,q),l(3,q));
                     phi(:,:,2) = obj.N{2}(l(1,q),l(2,q),l(3,q));
@@ -463,7 +460,7 @@ classdef HCurlElement < ofem_v2.elements.Finite_Elements & handle
             if isa(f,'function_handle')
                 elco = reshape(phys.geometry.co(:,:,phys.geometry.el(pIdx,1:Nl)'),[],Nl,Ne);
                 for q=1:Nq
-                    X = elco*([l(:,q);1-sum(l(:,q))]);
+                    X = pagemtimes(elco,[1-sum(l(:,q));l(:,q)]);
                     A = ofem_v2.tools.matrixarray(f(X));
                     phi(:,:,1) = obj.curlN{1}(l(1,q),l(2,q),l(3,q));
                     phi(:,:,2) = obj.curlN{2}(l(1,q),l(2,q),l(3,q));
@@ -536,13 +533,13 @@ classdef HCurlElement < ofem_v2.elements.Finite_Elements & handle
             Dk = phys.geometry.Dk;
             detD = phys.geometry.detD;
             Ne = phys.geometry.Nint;
-            l(4,:) = 1-sum(l,1);
-            Nl = size(l,1);
+            Nl = 4;
             Np = size(l,2);
-            elco = reshape(phys.geometry.co(:,:,phys.geometry.el(:,:)'),[],Nl,Ne);
+            elco = reshape(phys.geometry.co(:,:,phys.geometry.el(:,1:Nl)'),[],Nl,Ne);
             X = zeros(3,Ne,Np);
             for i = 1:Np
-                X(:,:,i) = reshape(elco*l(:,i),3,[]);
+                % local vertex 1 has barycentric 1-sum(l)
+                X(:,:,i) = reshape(pagemtimes(elco,[1-sum(l(:,i));l(:,i)]),3,[]);
             end
             elu = ofem_v2.tools.matrixarray(reshape(u(phys.DOFs.el2DOF(:,:)'),[],1,Ne));
             for q = 1:Np
@@ -615,3 +612,13 @@ classdef HCurlElement < ofem_v2.elements.Finite_Elements & handle
 
 end
 
+function B = materialTimes(A,P)
+    % material values A (1 x 1 x Ne scalar or d x d x Ne tensor) times the
+    % basis values P (d x Ns x Ne)
+    A = double(A);
+    if size(A,1) == 1 && size(A,2) == 1
+        B = A.*P;
+    else
+        B = pagemtimes(A,P);
+    end
+end
