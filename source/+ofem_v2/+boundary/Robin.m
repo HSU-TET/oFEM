@@ -1,202 +1,142 @@
 classdef Robin < handle & ofem_v2.boundary.MixedBoundary
-	%ROBINBOUNDARY Summary of this class goes here
-	%   Detailed explanation goes here
-	
+	%ROBIN Robin boundary condition  k du/dn + alpha*u = beta*g  for H1
+	%elements
+	%
+	%   bc = Robin(value, alpha, beta, feBd, boundaryName, mesh)
+	%
+	%   Adds int alpha*u*v ds to M_robin and int beta*g*v ds to the right
+	%   hand side. value (g), alpha and beta are constants or function
+	%   handles f(X) / f(X,n) of the points X (dim x 1 x N) and the outer
+	%   unit normals n (dim x 1 x N), returning 1 x 1 x N.
+	%
+	%   The trace of the volume basis is integrated on every boundary cell
+	%   (traceData / traceBasis), so any degree works in 2D and 3D; feBd is
+	%   no longer needed and only kept for compatibility.
+	%
+	%   lumped = true gives the row-sum lumped boundary mass matrix, which
+	%   is what the previous implementation computed (its row and column
+	%   indices coincided). The default is the consistent mass matrix.
+
 	properties
 		value;
 		boundary;
 		index;
+		name;
 		meas;
 		normalVector;
-		bd;
 		dim;
 		feBd;
 		edges;
 		nodes;
 		faces;
+		interiors = [];
 		elems;
 		alpha;
 		beta;
-		
+		lumped = false;
 		M;
 		b;
 	end
-	
+
 	methods
-		function obj=Robin(value, alpha, beta, feBd, boundaryName, mesh)
+		function obj = Robin(value, alpha, beta, feBd, boundaryName, mesh)
 			obj.value = value;
-			obj.feBd = feBd;
 			obj.alpha = alpha;
 			obj.beta = beta;
-			
-			n = size(mesh.bd, 2);
-			for i = 1:n
-				if isequal(mesh.bd{1,i},boundaryName)
-					obj.boundary = mesh.bd{2,i};%unique(sort(mesh.bd{2,i},2),'rows');
-					obj.index= i;
-					break;
+			obj.feBd = feBd;
+			if ischar(boundaryName) || isstring(boundaryName)
+				obj.index = find(cellfun(@(s) isequal(s,char(boundaryName)), mesh.bd(1,:)),1);
+				if isempty(obj.index)
+					error('ofem_v2:boundary:Robin','Boundary ''%s'' not found.',boundaryName);
 				end
+			else
+				obj.index = boundaryName;
 			end
-			
+			obj.name = mesh.bd{1,obj.index};
+			obj.boundary = unique(sort(mesh.bd{2,obj.index},2),'rows');
+			obj.nodes = unique(obj.boundary(:));
+			obj.elems = size(obj.boundary,1);
+			obj.dim = mesh.dim - 1;
 			switch mesh.dim
 				case 2
-					[~,obj.edges] = ismember(sort(obj.boundary,2),mesh.ed,'rows');
-					obj.nodes = unique(obj.boundary(:));
-					edges = mesh.co(:,:,mesh.bd{2, obj.index}(:,2))- mesh.co(:,:,mesh.bd{2, obj.index}(:,1));
-					obj.meas = sqrt(pagemtimes(edges,'transpose',edges,'none'));
-					obj.normalVector = pagemtimes(pagemtimes([0,1;-1,0],edges),pageinv(obj.meas));
-					obj.dim = 1;
-					obj.elems = size(obj.edges,1);
+					[~,obj.edges] = ismember(obj.boundary,mesh.ed,'rows');
+					obj.faces = [];
 				case 3
-					[~,obj.faces] = ismember(sort(obj.boundary,2),mesh.fa,'rows');
-					obj.faces = unique(obj.faces);
-					obj.edges = mesh.fa2ed(obj.faces,:);
-					obj.edges = unique(obj.edges(:));
-					obj.nodes = unique(obj.boundary(:));
-					e1 = mesh.co(:,:,mesh.bd{2, obj.index}(:,2))-mesh.co(:,:,mesh.bd{2, obj.index}(:,1));
-					e2 = mesh.co(:,:,mesh.bd{2, obj.index}(:,3))-mesh.co(:,:,mesh.bd{2, obj.index}(:,1));
-					obj.normalVector = cross(e1,e2,1);
-					obj.meas = sqrt(dot(obj.normalVector,obj.normalVector,1))/2;
-					obj.dim = 2;
-					obj.elems = size(obj.faces,1);
+					[~,obj.faces] = ismember(obj.boundary,mesh.fa,'rows');
+					obj.edges = unique(reshape(mesh.fa2ed(obj.faces,:),[],1));
 			end
+			td = ofem_v2.boundary.traceData(mesh, obj.boundary, 1);
+			obj.meas = td.meas;
+			obj.normalVector = td.normal;
 		end
-		
-		function b = loadVector(obj, physicalProblem)			
-			[w,l] = ofem_v2.tools.gaussSimplex(obj.dim, obj.feBd.degree);
-			
-			N = max(physicalProblem.DOFs.DOFs);
-			dofs = [];
-			if ~isempty(physicalProblem.DOFs.n2DOF)
-                if obj.dim == 2
-				    dofs = [dofs;physicalProblem.geometry.fa(obj.faces,:)];
-                elseif obj.dim == 1
-                    nodes = physicalProblem.geometry.ed(obj.edges,:)';
-                    nodes = nodes(:);
-                    tmp = physicalProblem.DOFs.n2DOF(nodes,:)';
-                    tmp = tmp(:);
-                    dofs = [dofs;tmp];
-                end
-			end
-			if ~isempty(physicalProblem.DOFs.e2DOF)
-				dofs = [dofs,physicalProblem.DOFs.e2DOF(physicalProblem.geometry.fa2ed(obj.faces,:))];
-			end
-			if ~isempty(physicalProblem.DOFs.f2DOF)
-				dofs = [dofs;physicalProblem.DOFs.f2DOF(obj.faces)];
-			end
-			
-			Nl     = size(l  ,2); % number of barycentric coordinates
-			Nq     = size(w  ,1);
-			Ns     = obj.feBd.DOFsPerElement;
-			Nf     = obj.elems;
-			
-			% faceco gives global quadrature points => eval there
-			%faceco = reshape(physicalProblem.geometry.co(:,:,obj.bd(:,1:Nl)'),[],Nl,Nf);
-			
-			F      = zeros(1,Ns,Nf);
-			
-			if isa(obj.value,'function_handle')
-				for q  = 1:Nq
-					cnt = ones(size(l(:,q),1),1);
-					lTemp = mat2cell(l(:,q),cnt);
-					phi = obj.feBd.phi{1}(lTemp{:});
-					val = obj.value(obj.normalVector);
-					F = F + val'*(w(q)*phi);
-				end
-			else
-				for q=1:Nq
-					cnt = ones(size(l(:,q),1),1);
-					lTemp = mat2cell(l(:,q),cnt);
-					phi = obj.feBd.phi{1}(lTemp{:});
-					F = F + obj.value*(w(q)*phi);
-				end
-			end
-			
-			F = pagemtimes(pagemtimes(F,obj.meas),obj.beta);
-			I = dofs';
-			obj.b = sparse(I(:),1,F(:),N,1);
+
+		function b = loadVector(obj, phys)
+			fe = phys.element;
+			anyFun = isa(obj.value,'function_handle') || isa(obj.beta,'function_handle');
+			td = ofem_v2.boundary.traceData(phys.geometry, obj.boundary, ...
+				ofem_v2.boundary.Robin.order(fe.degree, anyFun, false));
+			P = ofem_v2.boundary.traceBasis(td, phys.geometry, fe.phi);     % 1 x Ns x Nq x Nf
+			[~,Ns,Nq,Nf] = size(P);
+			g = obj.evaluate(obj.value, td).*obj.evaluate(obj.beta, td);   % 1 x 1 x Nq x Nf
+			jw = reshape(td.w,1,1,Nq).*reshape(td.jac,1,1,1,Nf);
+			F = reshape(sum(P.*g.*jw,3),Ns,Nf);
+			dofs = phys.DOFs.el2DOF(td.elem,:);
+			obj.b = sparse(reshape(dofs',[],1),1,F(:),phys.DOFs.Nd,1);
 			b = obj.b;
 		end
-		
-		function M = assembleMass(obj, physicalProblem)
-			[w,l] = ofem_v2.tools.gaussSimplex(obj.dim, obj.feBd.degree);
-			
-			N = max(physicalProblem.DOFs.DOFs);
-			dofs = [];
-			if ~isempty(physicalProblem.DOFs.n2DOF)
-                if obj.dim == 2
-				    dofs = [dofs;physicalProblem.geometry.fa(obj.faces,:)];
-                elseif obj.dim == 1
-                    nodes = physicalProblem.geometry.ed(obj.edges,:)';
-                    nodes = nodes(:);
-                    tmp = physicalProblem.DOFs.n2DOF(nodes,:)';
-                    tmp = tmp(:);
-                    dofs = [dofs;tmp];
-                end
-			end
-			if ~isempty(physicalProblem.DOFs.e2DOF)
-				dofs = [dofs,physicalProblem.DOFs.e2DOF(physicalProblem.geometry.fa2ed(obj.faces,:))];
-            end
-			if ~isempty(physicalProblem.DOFs.f2DOF)
-				dofs = [dofs;physicalProblem.DOFs.f2DOF(obj.faces)];
-			end
-			
-			Nl     = size(l  ,2); % number of barycentric coordinates
-			Nq     = size(w  ,1);
-			Ns     = obj.feBd.DOFsPerElement;
-			Nf     = obj.elems;
-			
-			% faceco gives global quadrature points => eval there
-			%faceco = reshape(physicalProblem.geometry.co(:,:,obj.bd(:,1:Nl)'),[],Nl,Nf);
-			
-			M      = zeros(Ns,Ns,Nf);
-			
-			if isa(obj.value,'function_handle')
-				for q  = 1:Nq
-					cnt = ones(size(l(:,q),1),1);
-					lTemp = mat2cell(l(:,q),cnt);
-					phi = obj.feBd.phi{1}(lTemp{:});
-					val = obj.value(obj.normalVector);
-					F = F + val'*(w(q)*phi);
-				end
-			else
-				for q=1:Nq
-					cnt = ones(size(l(:,q),1),1);
-					lTemp = mat2cell(l(:,q),cnt);
-					phi = obj.feBd.phi{1}(lTemp{:});
-					M = M + obj.alpha*w(q)*(phi'*phi);
-				end
-			end
-			
+
+		function M = assembleMass(obj, phys)
+			fe = phys.element;
+			td = ofem_v2.boundary.traceData(phys.geometry, obj.boundary, ...
+				ofem_v2.boundary.Robin.order(fe.degree, isa(obj.alpha,'function_handle'), true));
+			P = ofem_v2.boundary.traceBasis(td, phys.geometry, fe.phi);     % 1 x Ns x Nq x Nf
+			[~,Ns,Nq,Nf] = size(P);
+			a = obj.evaluate(obj.alpha, td);
+			jw = reshape(td.w,1,1,Nq).*reshape(td.jac,1,1,1,Nf).*a;
+			P = reshape(P,Ns,Nq,Nf);
+			Me = pagemtimes(P.*reshape(jw,1,Nq,Nf),'none',P,'transpose');  % Ns x Ns x Nf
+			dofs = phys.DOFs.el2DOF(td.elem,:);
 			I = repmat(dofs,1,Ns)';
-            I = I(:);
-			J = repelem(dofs,1,Ns)';
-            J = J(:);
-			M = pagemtimes(M,obj.meas);
-			obj.M = sparse(I(:),J(:),M(:),N,N);
-			M = obj.M;
+			J = repelem(dofs',Ns,1);
+			N = phys.DOFs.Nd;
+			M = sparse(I(:),J(:),Me(:),N,N);
+			if obj.lumped
+				M = spdiags(full(sum(M,2)),0,N,N);
+			end
+			obj.M = M;
+		end
+	end
+
+	methods (Access = private)
+		function v = evaluate(~, f, td)
+			% values at the quadrature points: 1 x 1 x Nq x Nf
+			[~,Nq,Nf] = size(td.X);
+			if ~isa(f,'function_handle')
+				v = f*ones(1,1,Nq,Nf);
+				return
+			end
+			v = zeros(1,1,Nq,Nf);
+			for q = 1:Nq
+				if nargin(f) >= 2
+					fq = f(td.X(:,q,:),td.normal);
+				else
+					fq = f(td.X(:,q,:));
+				end
+				v(1,1,q,:) = reshape(double(fq),1,1,1,Nf);
+			end
+		end
+	end
+
+	methods (Static)
+		function q = order(p, anyFun, mass)
+			% exact for constant data; for function data up to degree p+2
+			if anyFun
+				q = 2*p + 2;
+			elseif mass
+				q = 2*p;
+			else
+				q = p;
+			end
 		end
 	end
 end
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

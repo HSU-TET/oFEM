@@ -1,6 +1,10 @@
 classdef WaveguideInput < handle & ofem_v2.boundary.FixedBoundary
-	%WAVEGUIDEINPUT Summary of this class goes here
-	%   Detailed explanation goes here
+	%WAVEGUIDEINPUT tangential field of a waveguide mode on a port (3D)
+	%
+	%   bc = WaveguideInput(u_in, x, name, mesh)
+	%
+	%   u_in  transverse field samples (2 x Np) at the points x (2 x Np) of
+	%         the port plane (coordinates 1 and 2 of the mesh points)
 	
 	properties
 		value;
@@ -54,45 +58,26 @@ classdef WaveguideInput < handle & ofem_v2.boundary.FixedBoundary
 		end
 
 		function u = loadVector(obj, phys)
-			% handle edges
-			% TODO: 1 dim quadrature
-			[w,l] = ofem_v2.tools.gaussSimplex(1,1);
-			eDofs = phys.DOFs.e2DOF(obj.edges,:);
-			eDofs = reshape(eDofs',1,phys.element.degree+1,[]);
-			v1 = phys.geometry.co(:,:,phys.geometry.ed(obj.edges,1));
-			v2 = phys.geometry.co(:,:,phys.geometry.ed(obj.edges,2));
-			tang = v2-v1;
-			tang = double(tang);%*ofem_v2.tools.matrixarray(1/vecnorm(tang));
-
-			% Interpolate at edge center using stefans function
-			obj.cell2edge(phys);
-
-			b = ofem_v2.tools.matrixarray(zeros(size(eDofs)));
-			%obj.b = ofem_v2.tools.matrixarray(reshape(obj.b,1,size(eDofs,2),[]));
-
-			for q = 1:length(w)
-				b = b + pagemtimes(obj.value,'transpose',tang,'none');
-			end
-
-			obj.u = sparse(eDofs(:),1,b(:),phys.DOFs.Nd,1);
-
+			% The mode field at a point is the mean of the n nearest samples
+			% u_in at x (coordinates 1:2 of the point, i.e. a port in a plane
+			% z = const); it is set by the L2 projection of its tangential
+			% trace (see tangentialProjection). The previous version assigned
+			% value.t to every edge DOF, which has the wrong sign for the
+			% Whitney DOFs and is wrong for the higher order DOFs.
+			obj.u = ofem_v2.boundary.tangentialProjection(phys, obj.boundary, ...
+				obj.edges, obj.faces, @(X) obj.mode(X));
 			u = obj.u;
 			phys.DOFs.reduceDOFs(obj);
 		end
 
-		function cell2edge(obj, phys)
-			% convert cell data from modes to edge data
-			v1 = phys.geometry.co(:,:,phys.geometry.ed(obj.edges,1));
-			v2 = phys.geometry.co(:,:,phys.geometry.ed(obj.edges,2));
-			xq = (v1+v2)/2;
-			xq = xq(1:2,:,:);
-			n = 10;%5;		
-    		co_idx = knnsearch(obj.x',squeeze(xq)','K',n)';
-		
-    		ui_x = (sum((reshape(obj.u_in(1,co_idx(:,:)'),[],n)),2)/n);
-    		ui_y = (sum((reshape(obj.u_in(2,co_idx(:,:)'),[],n)),2)/n);
-			obj.value = reshape([ui_x,ui_y]',2,1,[]);
-			obj.value(3,:,:) = 0;
+		function v = mode(obj, X)
+			% interpolated mode field at the points X (3 x 1 x N): 3 x 1 x N
+			n = min(obj.k, size(obj.x,2));
+			xq = reshape(double(X(1:2,1,:)),2,[])';
+			idx = knnsearch(obj.x',xq,'K',n);
+			ux = mean(reshape(obj.u_in(1,idx),[],n),2);
+			uy = mean(reshape(obj.u_in(2,idx),[],n),2);
+			v = reshape([ux, uy, zeros(size(ux))]',3,1,[]);
 		end
 	end
 end
